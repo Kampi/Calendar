@@ -1,0 +1,239 @@
+/*
+ * caldav_example.c
+ *
+ *  Copyright (C) Daniel Kampert, 2026
+ *  Website: www.kampis-elektroecke.de
+ *  File info: Example implementation demonstrating caldav client usage for CalDAV operations.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * Errors and commissions should be reported to DanielKampert@kampis-elektroecke.de
+ */
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+
+#include "caldav_client.h"
+#include "esp_log.h"
+#include "wifi_connect.h"
+#include <string.h>
+
+static const char *TAG = "caldav-Example";
+
+/** @brief Tests the caldav connection.
+ */
+void webdav_example_test_connection(void)
+{
+    ESP_LOGI(TAG, "=== caldav Connection Test ===");
+    
+    /* Create configuration */
+    CalDAV_Config_t config = {
+        .ServerURL = "https://admin.kampert.synology.me",
+        .Username = "Daniel Kampert",
+        .Password = "do3PQKmk",
+        .CalendarPath = "/caldav.php/Daniel%20Kampert/default/",
+        .TimeoutMs = 5000,
+        .UseHTTPS = true,
+    };
+
+    /* Initialize client */
+    CalDAV_Client_t *client = CalDAV_Client_Init(&config);
+    if (!client) {
+        ESP_LOGE(TAG, "caldav client initialization failed");
+        return;
+    }
+    
+    /* Test connection */
+    CalDAV_Error_t err = CalDAV_Test_Connection(client);
+    if (err == CALDAV_ERROR_OK) {
+        ESP_LOGI(TAG, "✓ Connection successful!");
+    } else {
+        ESP_LOGE(TAG, "✗ Connection failed (Error: %d)", err);
+    }
+    
+    // Client freigeben
+    CalDAV_Client_Deinit(client);
+}
+
+/**
+ * @brief Beispiel-Funktion zum Auslesen von Kalender-Events
+ */
+void webdav_example_list_events(void)
+{
+    ESP_LOGI(TAG, "=== caldav List Calendar Events ===");
+    
+    CalDAV_Config_t config = {
+        .ServerURL = "https://admin.kampert.synology.me",
+        .Username = "Daniel Kampert",
+        .Password = "do3PQKmk",
+        .CalendarPath = "/caldav.php/Daniel%20Kampert/default/",  // Pfad zu deinem Kalender
+        .TimeoutMs = 5000,
+        .UseHTTPS = true,
+    };
+    
+    CalDAV_Client_t *client = CalDAV_Client_Init(&config);
+    if (!client) {
+        ESP_LOGE(TAG, "caldav client initialization failed");
+        return;
+    }
+    
+    /* Retrieve events */
+    CalDAV_Calendar_Event_t *events = NULL;
+    size_t event_count = 0;
+    
+    /* Define time range: January 1, 2020 to December 31, 2030 */
+    const char *start_time = "20200101T000000Z";
+    const char *end_time = "20301231T235959Z";
+    
+    CalDAV_Error_t err = CalDAV_Calendar_Events_List(client, &events, &event_count, start_time, end_time);
+    if (err == CALDAV_ERROR_OK) {
+        ESP_LOGI(TAG, "✓ %d events found:", event_count);
+        
+        for (size_t i = 0; i < event_count; i++) {
+            ESP_LOGI(TAG, "Event %d:", i + 1);
+            if (events[i].summary) {
+                ESP_LOGI(TAG, "  Title: %s", events[i].summary);
+            }
+            if (events[i].description) {
+                ESP_LOGI(TAG, "  Description: %s", events[i].description);
+            }
+            if (events[i].start_time) {
+                ESP_LOGI(TAG, "  Start: %s", events[i].start_time);
+            }
+            if (events[i].end_time) {
+                ESP_LOGI(TAG, "  End: %s", events[i].end_time);
+            }
+            if (events[i].location) {
+                ESP_LOGI(TAG, "  Location: %s", events[i].location);
+            }
+        }
+        
+        /* Free events */
+        CalDAV_Events_Free(events, event_count);
+    } else {
+        ESP_LOGE(TAG, "✗ Failed to retrieve events (Error: %d)", err);
+    }
+    
+    CalDAV_Client_Deinit(client);
+}
+
+
+
+/**
+ * @brief Beispiel-Funktion zum Auflisten von Events aus einem bestimmten Kalender
+ */
+void webdav_example_list_calendar_events(const char *calendar_path)
+{
+    ESP_LOGI(TAG, "=== caldav List Events from Calendar '%s' ===", calendar_path);
+
+    /* Create full calendar path */
+    char full_calendar_path[256];
+    snprintf(full_calendar_path, sizeof(full_calendar_path), "/caldav.php/Daniel%%20Kampert/%s/", calendar_path);
+
+    CalDAV_Config_t config = {
+        .ServerURL = "https://admin.kampert.synology.me",
+        .Username = "Daniel Kampert",
+        .Password = "do3PQKmk",
+        .CalendarPath = full_calendar_path,
+        .TimeoutMs = 10000,  // Längerer Timeout für Event-Abfragen
+        .UseHTTPS = true,
+    };
+
+    CalDAV_Client_t *client = CalDAV_Client_Init(&config);
+    if (!client) {
+        ESP_LOGE(TAG, "caldav client initialization failed");
+        return;
+    }
+
+    /* Retrieve events */
+    CalDAV_Calendar_Event_t *events = NULL;
+    size_t event_count = 0;
+
+    /* Define time range: January 1, 2020 to December 31, 2030 */
+    const char *start_time = "20200101T000000Z";
+    const char *end_time = "20301231T235959Z";
+
+    CalDAV_Error_t err = CalDAV_Calendar_Events_List(client, &events, &event_count, start_time, end_time);
+    if (err == CALDAV_ERROR_OK) {
+        ESP_LOGI(TAG, "✓ %d events found:", event_count);
+
+        for (size_t i = 0; i < event_count; i++) {
+            ESP_LOGI(TAG, "\nEvent %d:", i + 1);
+            if (events[i].summary) {
+                ESP_LOGI(TAG, "  Title: %s", events[i].summary);
+            }
+            if (events[i].description) {
+                ESP_LOGI(TAG, "  Description: %s", events[i].description);
+            }
+            if (events[i].start_time) {
+                ESP_LOGI(TAG, "  Start: %s", events[i].start_time);
+            }
+            if (events[i].end_time) {
+                ESP_LOGI(TAG, "  End: %s", events[i].end_time);
+            }
+            if (events[i].location) {
+                ESP_LOGI(TAG, "  Location: %s", events[i].location);
+            }
+        }
+
+        /* Free events */
+        CalDAV_Events_Free(events, event_count);
+    } else {
+        ESP_LOGE(TAG, "✗ Failed to retrieve events (Error: %d)", err);
+    }
+
+    CalDAV_Client_Deinit(client);
+}
+
+/**
+ * @brief Vollständige Beispiel-Funktion mit WiFi und caldav
+ */
+void webdav_example_full(void)
+{
+    ESP_LOGI(TAG, "=== Vollständiges caldav Beispiel ===");
+
+    // Warte auf WiFi-Verbindung
+    ESP_LOGI(TAG, "Warte auf WiFi-Verbindung...");
+    int retry = 0;
+    while (!wifi_is_connected() && retry < 10) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        retry++;
+    }
+
+    if (!wifi_is_connected()) {
+        ESP_LOGE(TAG, "Keine WiFi-Verbindung - Abbruch");
+        return;
+    }
+
+    ESP_LOGI(TAG, "WiFi verbunden - starte caldav-Test");
+
+    // Verbindungstest
+    webdav_example_test_connection();
+
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    // Kalender auflisten
+    webdav_example_list_calendars();
+
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    // Events aus dem "home" Kalender auslesen
+    webdav_example_list_calendar_events("home");
+
+    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    // Events auslesen
+    webdav_example_list_events();
+
+    ESP_LOGI(TAG, "Beispiel abgeschlossen");
+}
