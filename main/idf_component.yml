@@ -1,0 +1,7 @@
+dependencies:
+  esp32_s3_lcd_ev_board:
+    version: '*'
+  lvgl/lvgl:
+    version: "^9.4.0"
+  espressif/esp_lcd_touch_gt911:
+    version: "^1.2.0"

@@ -1,0 +1,19 @@
+{
+    "caldav" : {
+        "url" : "",
+        "username" : "",
+        "password" : "",
+        "syncInterval" : 300
+    },
+    "wifi" : {
+        "ssid" : "",
+        "password" : "",
+        "maxRetries" : 5,
+        "retryInterval" : 2000
+    },
+    "system" : {
+        "timezone" : "CET-1CEST,M3.5.0,M10.5.0/3",
+        "server" : "pool.ntp.org",
+        "sleep": 10
+    }
+}

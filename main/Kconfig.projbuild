@@ -1,0 +1,16 @@
+menu "Calendar"
+    menu "CalDAV"
+        config CALENDAR_CALDAV_SERVER_URL
+            string "CalDAV Server URL"
+
+        config CALENDAR_CALDAV_SERVER_USERNAME
+            string "CalDAV Server username"
+
+        config CALENDAR_CALDAV_SERVER_PASSWORD
+            string "CalDAV Server password"
+
+        config CALENDAR_CALDAV_SERVER_TIMEOUT_MS
+            int "CalDAV server timeout"
+            default 5000
+    endmenu
+endmenu
