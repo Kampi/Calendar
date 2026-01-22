@@ -1,0 +1,3 @@
+[submodule "components/FastEPD"]
+	path = components/FastEPD
+	url = https://github.com/bitbank2/FastEPD.git

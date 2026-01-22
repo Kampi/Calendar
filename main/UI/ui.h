@@ -27,12 +27,33 @@
 #include <lvgl.h>
 #include <time.h>
 
-void UI_Dashboard_Create(uint8_t Hours_Start, uint8_t Hours_End);
-void UI_Dashboard_Update_Time(struct tm *timeinfo);
+#define UI_MAX_EVENTS               10
+
+lv_obj_t* UI_Dashboard_Create(uint8_t Hours_Start, uint8_t Hours_End);
+void UI_Dashboard_Update(struct tm *p_TimeInfo);
 void UI_Dashboard_Update_Battery(uint8_t Percentage);
-void UI_Dashboard_Add_Event(const char *day, uint8_t hour, const char *title, 
-                           const char *start_time, const char *end_time,
-                           const char *location, const char *description);
+void UI_Dashboard_Update_LastUpdate(struct tm *p_TimeInfo);
+void UI_Dashboard_Add_Event(int DayDiff, uint8_t Hour, const char *Title,
+                            const char *StartTime, const char *EndTime,
+                            const char *Location, const char *Description);
 void UI_Dashboard_Clear_Events(void);
+void UI_Dashboard_Destroy(void);
+
+lv_obj_t* UI_Status_Create(void);
+void UI_Status_Update_Text(const char* p_Text);
+void UI_Status_Update_Battery(uint8_t Percentage);
+void UI_Status_Update_RSSI(int8_t RSSI);
+void UI_Status_Destroy(void);
+
+lv_obj_t* UI_DayView_Create(void);
+void UI_DayView_Update_Header(struct tm *p_TimeInfo);
+void UI_DayView_Update_Battery(uint8_t Percentage);
+void UI_DayView_Update_RSSI(int8_t RSSI);
+void UI_DayView_Add_Event(int DayDiff, uint8_t Hour, const char *Title,
+                          const char *StartTime, const char *EndTime,
+                          const char *Location, const char *Description);
+void UI_DayView_Clear_Events(void);
+void UI_DayView_Show_No_Events(void);
+void UI_DayView_Destroy(void);
 
 #endif /* UI_H_ */
