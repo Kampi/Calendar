@@ -6,3 +6,4 @@
 dependencies.lock
 *.old
 managed_components
+data/settings.json

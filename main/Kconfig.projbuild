@@ -1,16 +1,91 @@
 menu "Calendar"
-    menu "CalDAV"
-        config CALENDAR_CALDAV_SERVER_URL
-            string "CalDAV Server URL"
+    menu "Settings"
+        config SETTINGS_NAMESPACE
+            string "Settings namespace for the NVS"
+            default "Calendar"
+    endmenu
 
-        config CALENDAR_CALDAV_SERVER_USERNAME
-            string "CalDAV Server username"
+    menu "Battery"
+        choice
+            prompt "ADC Unit"
+            default BATTERY_ADC_1
+            help
+                Select the used ADC unit.
 
-        config CALENDAR_CALDAV_SERVER_PASSWORD
-            string "CalDAV Server password"
+            config BATTERY_ADC_1
+                bool "ADC 1"
+            config BATTERY_ADC_2
+                bool "ADC 2"
+        endchoice
 
-        config CALENDAR_CALDAV_SERVER_TIMEOUT_MS
-            int "CalDAV server timeout"
-            default 5000
+        config BATTERY_ADC_CHANNEL
+            int "ADC channel used for battery measurement"
+            range 0 9
+            default 2
+
+        choice
+            prompt "ADC Attenuation"
+            default BATTERY_ADC_ATT_12
+            help
+                Select the used ADC attenuation.
+
+            config BATTERY_ADC_ATT_0
+                bool "0 dB ADC attenuation"
+            config BATTERY_ADC_ATT_2_5
+                bool "2.5 dB ADC attenuation"
+            config BATTERY_ADC_ATT_6
+                bool "6 dB ADC attenuation"
+            config BATTERY_ADC_ATT_12
+                bool "12 dB ADC attenuation"
+        endchoice
+
+        config BATTERY_ADC_MIN_MV
+            int "Minimal battery voltage in Millivolt"
+            default 3000
+
+        config BATTERY_ADC_MAX_MV
+            int "Maximal battery voltage in Millivolt"
+            default 4200
+
+        config BATTERY_ADC_R1
+            int "Value of the R1 resistor of the voltage divider"
+            default 2200
+
+        config BATTERY_ADC_R2
+            int "Value of the R2 resistor of the voltage divider"
+            default 2200
+    endmenu
+
+    menu "GUI"
+        choice
+            prompt "View"
+            default GUI_VIEW_LIST
+            help
+                Select the events view.
+
+            config GUI_VIEW_LIST
+                bool "List view"
+            config GUI_VIEW_TABLE
+                bool "Calendar view"
+        endchoice
+
+        config GUI_WIDTH
+            int "Screen width"
+            default 960
+
+        config GUI_HEIGHT
+            int "Screen Height"
+            default 540
+
+        config GUI_TOUCH_DEBUG
+            bool "Enable touch debug visualization"
+            default n
+            help
+                Show touch input visualization overlay with coordinates and crosshair.
+                Useful for calibrating touch input.
+
+        config GUI_LVGL_TICK_PERIOD_MS
+            int "LVGL Tick Period"
+            default 2
     endmenu
 endmenu

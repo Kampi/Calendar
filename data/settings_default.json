@@ -3,17 +3,21 @@
         "url" : "",
         "username" : "",
         "password" : "",
-        "syncInterval" : 300
+        "timeout" : 30,
+        "calendars" : [
+            "Calendar1", "Calendar2", "..."
+        ]
     },
     "wifi" : {
         "ssid" : "",
         "password" : "",
         "maxRetries" : 5,
-        "retryInterval" : 2000
+        "timeout" : 5000
     },
     "system" : {
         "timezone" : "CET-1CEST,M3.5.0,M10.5.0/3",
-        "server" : "pool.ntp.org",
-        "sleep": 10
+        "ntp-server" : "pool.ntp.org",
+        "ntp-sync-interval": 3600,
+        "sleep-hours": 3
     }
 }

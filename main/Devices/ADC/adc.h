@@ -1,9 +1,9 @@
 /*
- * caldav.h
+ * adc.h
  *
  *  Copyright (C) Daniel Kampert, 2026
  *  Website: www.kampis-elektroecke.de
- *  File info: CalDAV client handling.
+ *  File info: ADC driver interface for battery voltage monitoring.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,35 +21,23 @@
  * Errors and commissions should be reported to DanielKampert@kampis-elektroecke.de
  */
 
-#ifndef CALDAV_H_
-#define CALDAV_H_
+#ifndef ADC_H_
+#define ADC_H_
+
+#include <stdint.h>
+#include <stdbool.h>
 
 #include <esp_err.h>
 
-#include "caldav_client.h"
+esp_err_t ADC_Init(void);
 
-/** @brief  Initialize CalDAV client
- *  @return CalDAV client handle or NULL on failure
+esp_err_t ADC_Deinit(void);
+
+/** @brief          Read battery voltage and calculate percentage
+ *  @param p_Voltage   Pointer to store battery voltage in mV
+ *  @param p_Percentage Pointer to store battery percentage (0-100%)
+ *  @return         ESP_OK on success
  */
-CalDAV_Client_t *CalDAV_Init(void);
+esp_err_t ADC_ReadBattery(int *p_Voltage, uint8_t *p_Percentage);
 
-/** @brief
- *  @param p_Client
- *  @return
- */
-esp_err_t CalDAV_Deinit(CalDAV_Client_t *p_Client);
-
-/** @brief
- *  @param p_Client
- *  @return
- */
-esp_err_t CalDAV_List_Calendars(CalDAV_Client_t *p_Client);
-
-/** @brief
- *  @param p_Client
- *  @param p_Path
- *  @return
- */
-esp_err_t CalDAV_List_Calendar_Events(CalDAV_Client_t *p_Client, const char* p_Path);
-
-#endif /* CALDAV_H_ */
+#endif /* ADC_H_ */

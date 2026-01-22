@@ -27,6 +27,8 @@
 
 #include "sntp.h"
 
+ESP_EVENT_DEFINE_BASE(SNTP_EVENTS);
+
 static const char *TAG = "sntp";
 
 /** @brief      SNTP time synchronization callback.
@@ -39,15 +41,17 @@ static void on_SNTP_Time_Sync(struct timeval *p_tv)
     esp_event_post(SNTP_EVENTS, SNTP_EVENT_SNTP_SYNCED, p_tv, sizeof(struct timeval), portMAX_DELAY);
 }
 
-esp_err_t SNTP_Init(const char* p_Timezone, const char* p_Server)
+esp_err_t SNTP_Init(const char* p_Timezone, const char* p_Server, uint32_t SyncInterval)
 {
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, p_Server);
     esp_sntp_set_time_sync_notification_cb(on_SNTP_Time_Sync);
     esp_sntp_init();
 
-    setenv("TZ", p_Timezone, 1);
-    tzset();
+    SNTP_SetTimezone(p_Timezone);
+
+    /* Setup automatic sync timer if interval is specified */
+    esp_sntp_set_sync_interval(3600);
 
     return ESP_OK;
 }
