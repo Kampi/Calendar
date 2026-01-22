@@ -5,3 +5,4 @@
 .vscode/ipch
 dependencies.lock
 *.old
+managed_components
