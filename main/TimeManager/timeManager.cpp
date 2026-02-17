@@ -31,6 +31,8 @@
 #include "../SNTP/sntp.h"
 #include "../Devices/RTC/bm8563.h"
 
+ESP_EVENT_DEFINE_BASE(TIMEMANAGER_EVENTS);
+
 static const char *TAG = "TimeManager";
 
 typedef struct {
@@ -39,6 +41,7 @@ typedef struct {
     bool isSNTPSynced;
     time_t last_sync_time;
     i2c_master_dev_handle_t RTC_Handle;
+    gpio_num_t AlarmIntPin;
 } TimeManager_State_t;
 
 static TimeManager_State_t _TimeManager_State = {
@@ -47,6 +50,7 @@ static TimeManager_State_t _TimeManager_State = {
     .isSNTPSynced = false,
     .last_sync_time = 0,
     .RTC_Handle = NULL,
+    .AlarmIntPin = GPIO_NUM_NC,
 };
 
 static void _TimeManager_on_Event(void *p_HandlerArgs, esp_event_base_t Base, int32_t ID, void *p_Data)
@@ -73,11 +77,13 @@ esp_err_t TimeManager_Init(const TimeManager_Config_t *p_Config)
 
     if (p_Config == NULL) {
         ESP_LOGE(TAG, "Invalid configuration!");
+
         return ESP_ERR_INVALID_ARG;
     }
 
     if (_TimeManager_State.initialized) {
         ESP_LOGW(TAG, "Time manager already initialized");
+
         return ESP_OK;
     }
 
@@ -122,6 +128,11 @@ esp_err_t TimeManager_Deinit(void)
         return ESP_OK;
     }
 
+    /* Remove GPIO interrupt if configured */
+    if (_TimeManager_State.AlarmIntPin != GPIO_NUM_NC) {
+        gpio_isr_handler_remove(_TimeManager_State.AlarmIntPin);
+    }
+
     SNTP_Deinit();
 
     BM8563_Deinit(&_TimeManager_State.RTC_Handle);
@@ -129,6 +140,7 @@ esp_err_t TimeManager_Deinit(void)
     _TimeManager_State.initialized = false;
     _TimeManager_State.isTimeValid = false;
     _TimeManager_State.last_sync_time = 0;
+    _TimeManager_State.AlarmIntPin = GPIO_NUM_NC;
 
     ESP_LOGD(TAG, "Time manager deinitialized");
 
@@ -161,6 +173,7 @@ esp_err_t TimeManager_SetTime(const struct tm *p_TimeInfo, bool SyncRTC)
 
     if (t == -1) {
         ESP_LOGE(TAG, "Invalid time");
+
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -172,6 +185,7 @@ esp_err_t TimeManager_SetTime(const struct tm *p_TimeInfo, bool SyncRTC)
 
     if (settimeofday(&p_TV, NULL) != 0) {
         ESP_LOGE(TAG, "Failed to set system time");
+
         return ESP_FAIL;
     }
 
@@ -192,22 +206,27 @@ esp_err_t TimeManager_SetTime(const struct tm *p_TimeInfo, bool SyncRTC)
 
 esp_err_t TimeManager_SyncFromRTC(void)
 {
+    esp_err_t Error;
+    struct tm p_TimeInfo;
+
     if (_TimeManager_State.initialized == false) {
         ESP_LOGE(TAG, "Time manager not initialized");
+
         return ESP_ERR_INVALID_STATE;
     }
 
     /* Check if RTC has valid time */
-    if (BM8563_IsValid(_TimeManager_State.RTC_Handle) == false) {
+    if (BM8563_IsValid(&_TimeManager_State.RTC_Handle) == false) {
         ESP_LOGW(TAG, "RTC does not have valid time");
+
         return ESP_ERR_INVALID_STATE;
     }
 
     /* Read time from RTC */
-    struct tm p_TimeInfo;
-    esp_err_t Error = BM8563_GetTime(_TimeManager_State.RTC_Handle, &p_TimeInfo);
+    Error = BM8563_GetTime(&_TimeManager_State.RTC_Handle, &p_TimeInfo);
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read time from RTC");
+
         return Error;
     }
 
@@ -246,24 +265,27 @@ esp_err_t TimeManager_SyncFromSNTP(uint32_t TimeoutMs)
 
 esp_err_t TimeManager_SyncToRTC(void)
 {
+    esp_err_t Error;
+    struct tm p_TimeInfo;
+
     if (_TimeManager_State.initialized == false) {
         return ESP_ERR_INVALID_STATE;
     }
 
     if (_TimeManager_State.isTimeValid == false) {
         ESP_LOGW(TAG, "System time not valid, cannot sync to RTC");
+
         return ESP_ERR_INVALID_STATE;
     }
 
     /* Get current system time */
-    struct tm p_TimeInfo;
-    esp_err_t Error = TimeManager_GetTime(&p_TimeInfo);
+    Error = TimeManager_GetTime(&p_TimeInfo);
     if (Error != ESP_OK) {
         return Error;
     }
 
     /* Write to RTC */
-    Error = BM8563_SetTime(_TimeManager_State.RTC_Handle, &p_TimeInfo);
+    Error = BM8563_SetTime(&_TimeManager_State.RTC_Handle, &p_TimeInfo);
     if (Error == ESP_OK) {
         ESP_LOGD(TAG, "RTC synced with system time");
     }
@@ -274,4 +296,82 @@ esp_err_t TimeManager_SyncToRTC(void)
 bool TimeManager_IsTimeValid(void)
 {
     return _TimeManager_State.isTimeValid;
+}
+
+esp_err_t TimeManager_SetAlarm(const struct tm *p_TimeInfo)
+{
+    esp_err_t Error;
+
+    if (_TimeManager_State.initialized == false) {
+        ESP_LOGE(TAG, "Time manager not initialized!");
+
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (p_TimeInfo == NULL) {
+        ESP_LOGE(TAG, "Invalid time info pointer!");
+
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    Error = BM8563_SetAlarm(&_TimeManager_State.RTC_Handle, p_TimeInfo);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set RTC alarm: %d", Error);
+        return Error;
+    }
+
+    ESP_LOGI(TAG, "RTC alarm set for %02d:%02d", p_TimeInfo->tm_hour, p_TimeInfo->tm_min);
+
+    return ESP_OK;
+}
+
+esp_err_t TimeManager_ClearAlarm(void)
+{
+    esp_err_t Error;
+
+    if (_TimeManager_State.initialized == false) {
+        ESP_LOGE(TAG, "Time manager not initialized!");
+
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    Error = BM8563_ClearAlarm(&_TimeManager_State.RTC_Handle);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to clear RTC alarm: %d!", Error);
+
+        return Error;
+    }
+
+    ESP_LOGD(TAG, "RTC alarm cleared");
+
+    return ESP_OK;
+}
+
+esp_err_t TimeManager_ClearAlarmFlag(void)
+{
+    if (_TimeManager_State.initialized == false) {
+        ESP_LOGE(TAG, "Time manager not initialized!");
+
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_err_t Error = BM8563_ClearAlarmFlag(&_TimeManager_State.RTC_Handle);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to clear RTC alarm flag: %d!", Error);
+
+        return Error;
+    }
+
+    ESP_LOGD(TAG, "RTC alarm flag cleared");
+
+    return ESP_OK;
+}
+
+bool TimeManager_IsAlarmActive(void)
+{
+    if (_TimeManager_State.initialized == false) {
+        return false;
+    }
+
+    return BM8563_IsAlarmActive(&_TimeManager_State.RTC_Handle);
 }
