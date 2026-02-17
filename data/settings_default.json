@@ -16,8 +16,9 @@
     },
     "system" : {
         "timezone" : "CET-1CEST,M3.5.0,M10.5.0/3",
+        "ntp-timeout": 5,
         "ntp-server" : "pool.ntp.org",
-        "ntp-sync-interval": 3600,
+        "ntp-sync-interval": 2,
         "sleep-hours": 3
     }
 }

@@ -47,8 +47,9 @@ typedef struct {
 typedef struct {
     char Timezone[32];                          /**< Timezone string (e.g., "CET-1CEST,M3.5.0,M10.5.0/3"). */
     char NTP_Server[32];                        /**< NTP server address. */
-    uint32_t NTP_SyncInterval;                  /**< NTP sync interval in seconds. */
+    uint32_t NTP_SyncInterval;                  /**< NTP sync interval in days (0 = never). */
     uint8_t SleepDurationHours;                 /**< Deep sleep duration in hours. */
+    uint32_t NTP_Timeout;                       /**< NTP fetch timeout in seconds */
 } App_Settings_System_t;
 
 /** @brief CalDAV settings.

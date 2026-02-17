@@ -124,7 +124,7 @@ static esp_lcd_panel_io_i2c_config_t I2C_Touch_Config = {
     },
     .scl_speed_hz = 400 * 1000,
 };
-static gpio_config_t pwroff_gpio = {
+static gpio_config_t PwrOff_GPIO = {
     .pin_bit_mask = (1ULL << GPIO_NUM_44),
     .mode = GPIO_MODE_OUTPUT,
     .pull_up_en = GPIO_PULLUP_DISABLE,
@@ -293,32 +293,18 @@ static void on_Touch_Handler(lv_indev_t *p_Indev, lv_indev_data_t *p_Data)
 
 extern "C" void app_main(void)
 {
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+
     esp_err_t Error;
     App_Settings_CalDAV_t CalDAV_Settings;
     App_Settings_WiFi_t WiFi_Settings;
     App_Settings_System_t System_Settings;
     Event_List_t *EventList;
-    bool isReset;
     int BatteryVoltage;
     int8_t RSSI = 0;
     uint8_t BatteryPercentage;
 
-    switch (esp_reset_reason()) {
-        case ESP_RST_POWERON: {
-            ESP_LOGD(TAG, "Power on reset");
-
-            isReset = true;
-
-            break;
-        }
-        default: {
-            ESP_LOGD(TAG, "Other reset reason: %d", esp_reset_reason());
-
-            isReset = false;
-
-            break;
-        }
-    }
+    ESP_LOGD(TAG, "Reset reason: %d", esp_reset_reason());
 
     ESP_ERROR_CHECK(SettingsManager_Init());
 
@@ -335,6 +321,7 @@ extern "C" void app_main(void)
     CalDAV_Config.TimeoutMs = CalDAV_Settings.TimeoutMs;
 
     I2CM_Init(&I2CM_Config, &I2C_Bus_Handle);
+    TimeManager_Config.BusHandle = I2C_Bus_Handle;
 
     lv_init();
 
@@ -379,41 +366,90 @@ extern "C" void app_main(void)
     ADC_ReadBattery(&BatteryVoltage, &BatteryPercentage);
     UI_Status_Update_Battery(BatteryPercentage);
 
-    /* Connect WiFi only if we need NTP update or calendar data */
-    ESP_LOGD(TAG, "Connecting to WiFi...");
-    Error = WiFi_Init(WiFi_Settings.SSID, WiFi_Settings.Password, WiFi_Settings.MaxRetries, WiFi_Settings.TimeoutMs);
-    if (Error != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to connect to WiFi: %d!", Error);
+    /* Initialize TimeManager first to check RTC status and SNTP sync requirements */
+    TimeManager_Init(&TimeManager_Config);
 
-        WiFi_Deinit();
+    bool NeedWiFi = false;
+    bool NeedSNTPSync = false;
 
-        /* Update status text */
-        UI_Status_Update_Text(LV_SYMBOL_WARNING " No WiFi");
-        lv_refr_now(Display);
-
-        goto main_power_down;
-    }
-
-    ESP_LOGD(TAG, "WiFi connected!");
-    RSSI = WiFi_GetLastRSSI();
-    UI_Status_Update_RSSI(RSSI);
-    lv_refr_now(Display);
-
-    /* Update time via NTP if needed */
-    if ((isReset == true) || (TimeManager_IsTimeValid() == false)) {
-        ESP_LOGD(TAG, "Updating time via NTP (isReset=%d)", isReset);
-        TimeManager_Config.BusHandle = I2C_Bus_Handle;
-        TimeManager_Init(&TimeManager_Config);
-        TimeManager_ClearAlarm();
-        TimeManager_SyncFromSNTP(5000);
-        if (TimeManager_GetTime(&CurrentTime) == ESP_OK) {
-            ESP_LOGD(TAG, "Time updated: %02d:%02d:%02d", CurrentTime.tm_hour, CurrentTime.tm_min, CurrentTime.tm_sec);
+    /* Check if RTC time is valid */
+    if (TimeManager_IsRTCValid() == false) {
+        ESP_LOGW(TAG, "RTC time invalid (VL flag set) - SNTP sync required");
+        NeedWiFi = true;
+        NeedSNTPSync = true;
+    } else {
+        /* RTC is valid, sync system time from RTC */
+        ESP_LOGI(TAG, "RTC time valid, syncing system time from RTC");
+        TimeManager_SyncFromRTC();
+        
+        /* Check if periodic SNTP sync is due */
+        if (TimeManager_IsSNTPSyncDue()) {
+            ESP_LOGI(TAG, "Periodic SNTP sync is due");
+            NeedWiFi = true;
+            NeedSNTPSync = true;
         }
     }
+
+    /* Always need WiFi for calendar data */
+    NeedWiFi = true;
+
+    /* Connect WiFi if needed */
+    if (NeedWiFi) {
+        ESP_LOGI(TAG, "Connecting to WiFi (SNTP sync: %s)...", NeedSNTPSync ? "yes" : "no");
+        Error = WiFi_Init(WiFi_Settings.SSID, WiFi_Settings.Password, WiFi_Settings.MaxRetries, WiFi_Settings.TimeoutMs);
+        if (Error != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to connect to WiFi: %d!", Error);
+
+            WiFi_Deinit();
+
+            /* Update status text */
+            UI_Status_Update_Text(LV_SYMBOL_WARNING " No WiFi");
+            lv_refr_now(Display);
+
+            /* If SNTP sync was required but failed, continue with RTC time */
+            if (NeedSNTPSync && TimeManager_IsRTCValid()) {
+                ESP_LOGW(TAG, "WiFi failed but RTC is valid, continuing with RTC time");
+            }
+
+            goto main_power_down;
+        }
+
+        ESP_LOGI(TAG, "WiFi connected!");
+        RSSI = WiFi_GetLastRSSI();
+        UI_Status_Update_RSSI(RSSI);
+        lv_refr_now(Display);
+
+        /* Initialize SNTP after WiFi is connected */
+        Error = TimeManager_InitSNTP();
+        if (Error != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initialize SNTP: %d", Error);
+
+            /* Skip SNTP sync if init failed */
+            NeedSNTPSync = false;
+        }
+
+        /* Perform SNTP sync if needed */
+        if (NeedSNTPSync) {
+            ESP_LOGI(TAG, "Performing SNTP sync...");
+            TimeManager_SyncFromSNTP(System_Settings.NTP_Timeout * 1000);
+            if (TimeManager_GetTime(&CurrentTime) == ESP_OK) {
+                ESP_LOGI(TAG, "Time updated via SNTP: %04d-%02d-%02d %02d:%02d:%02d",
+                         CurrentTime.tm_year + 1900, CurrentTime.tm_mon + 1, CurrentTime.tm_mday,
+                         CurrentTime.tm_hour, CurrentTime.tm_min, CurrentTime.tm_sec);
+            }
+        }
+    } else {
+        ESP_LOGI(TAG, "WiFi not needed, using RTC time");
+    }
+
+    TimeManager_GetTime(&CurrentTime);
 
     /* Fetch calendar events */
     if ((EventManager_Init() == ESP_OK) && (CalDAV_Client_Init(&CalDAV_Config, &Client) == ESP_OK)) {
         esp_err_t Error;
+        time_t StartTime;
+        time_t EndTime;
+
         struct tm Start = CurrentTime;
         Start.tm_hour = 0;
         Start.tm_min = 0;
@@ -430,10 +466,10 @@ extern "C" void app_main(void)
 #endif
 
         /* Normalize time structures */
-        time_t start_t = mktime(&Start);
-        time_t end_t = mktime(&End);
-        localtime_r(&start_t, &Start);
-        localtime_r(&end_t, &End);
+        StartTime = mktime(&Start);
+        EndTime = mktime(&End);
+        localtime_r(&StartTime, &Start);
+        localtime_r(&EndTime, &End);
 
         ESP_LOGI(TAG, "Loading events from %04d-%02d-%02d %02d:%02d:%02d to %04d-%02d-%02d %02d:%02d:%02d",
                  Start.tm_year + 1900, Start.tm_mon + 1, Start.tm_mday,
@@ -509,11 +545,22 @@ extern "C" void app_main(void)
 
 main_power_down:
     if (TimeManager_GetTime(&CurrentTime) == ESP_OK) {
-        CurrentTime.tm_hour += 3;
+        ESP_LOGI(TAG, "Current time: %02d:%02d:%02d", CurrentTime.tm_hour, CurrentTime.tm_min, CurrentTime.tm_sec);
+
+        CurrentTime.tm_hour += System_Settings.SleepDurationHours;
 
         /* Normalize the time after adding the sleep time */
         mktime(&CurrentTime);
 
+        /* Disable day/weekday filters for time-only alarm */
+        CurrentTime.tm_mday = -1;
+        CurrentTime.tm_wday = -1;
+
+        ESP_LOGI(TAG, "Setting alarm for: %02d:%02d", CurrentTime.tm_hour, CurrentTime.tm_min);
+
+        //vTaskDelay(100 / portTICK_PERIOD_MS);
+
+        /* Set new alarm (overwrites any existing alarm) */
         TimeManager_SetAlarm(&CurrentTime);
     }
 
@@ -521,11 +568,12 @@ main_power_down:
 
     I2CM_Deinit(I2C_Bus_Handle);
 
-    gpio_config(&pwroff_gpio);
+    gpio_config(&PwrOff_GPIO);
     for (uint8_t i = 0; i < 5; ++i)
     {
         gpio_set_level(GPIO_NUM_44, 0);
         vTaskDelay(50 / portTICK_PERIOD_MS);
         gpio_set_level(GPIO_NUM_44, 1);
+        vTaskDelay(50 / portTICK_PERIOD_MS);
     }
 }

@@ -119,6 +119,13 @@ static void SettingsManager_LoadSystem(SettingsManager_State_t *p_State, const c
         } else {
             p_State->Settings.System.SleepDurationHours = SETTINGS_SYSTEM_DEFAULT_SLEEP_DURATION_HOURS;
         }
+
+        cJSON *ntpTimeout = cJSON_GetObjectItem(system, "ntp-timeout");
+        if (cJSON_IsNumber(ntpTimeout)) {
+            p_State->Settings.System.NTP_Timeout = (uint32_t)(ntpTimeout->valueint);
+        } else {
+            p_State->Settings.System.NTP_Timeout = SETTINGS_SYSTEM_DEFAULT_NTP_TIMEOUT;
+        }
     } else {
         SettingsManager_InitDefaultSystem(&p_State->Settings);
     }

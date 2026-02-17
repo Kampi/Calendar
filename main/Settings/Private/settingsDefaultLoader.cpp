@@ -62,6 +62,7 @@ void SettingsManager_InitDefaultSystem(App_Settings_t *p_Settings)
     strncpy(p_Settings->System.NTP_Server, SETTINGS_SYSTEM_DEFAULT_NTP_SERVER, sizeof(p_Settings->System.NTP_Server));
     p_Settings->System.NTP_SyncInterval = SETTINGS_SYSTEM_DEFAULT_NTP_SYNC_INTERVAL;
     p_Settings->System.SleepDurationHours = SETTINGS_SYSTEM_DEFAULT_SLEEP_DURATION_HOURS;
+    p_Settings->System.NTP_Timeout = SETTINGS_SYSTEM_DEFAULT_NTP_TIMEOUT;
 }
 
 void SettingsManager_InitDefaultCalDAV(App_Settings_t *p_Settings)
