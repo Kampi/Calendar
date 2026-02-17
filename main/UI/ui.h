@@ -27,9 +27,11 @@
 #include <lvgl.h>
 #include <time.h>
 
+#include "../Export/fonts/custom_fonts.h"
+
 #define UI_MAX_EVENTS               10
 
-lv_obj_t* UI_Dashboard_Create(uint8_t Hours_Start, uint8_t Hours_End);
+lv_obj_t *UI_Dashboard_Create(uint8_t Hours_Start, uint8_t Hours_End);
 void UI_Dashboard_Update(struct tm *p_TimeInfo);
 void UI_Dashboard_Update_Battery(uint8_t Percentage);
 void UI_Dashboard_Update_LastUpdate(struct tm *p_TimeInfo);
@@ -39,13 +41,13 @@ void UI_Dashboard_Add_Event(int DayDiff, uint8_t Hour, const char *Title,
 void UI_Dashboard_Clear_Events(void);
 void UI_Dashboard_Destroy(void);
 
-lv_obj_t* UI_Status_Create(void);
+lv_obj_t *UI_Status_Create(void);
 void UI_Status_Update_Text(const char* p_Text);
 void UI_Status_Update_Battery(uint8_t Percentage);
 void UI_Status_Update_RSSI(int8_t RSSI);
 void UI_Status_Destroy(void);
 
-lv_obj_t* UI_DayView_Create(void);
+lv_obj_t *UI_DayView_Create(void);
 void UI_DayView_Update_Header(struct tm *p_TimeInfo);
 void UI_DayView_Update_Battery(uint8_t Percentage);
 void UI_DayView_Update_RSSI(int8_t RSSI);

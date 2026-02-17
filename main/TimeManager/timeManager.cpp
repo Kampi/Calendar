@@ -88,7 +88,7 @@ static esp_err_t save_last_sync_time(time_t sync_time)
 
 static void _TimeManager_on_Event(void *p_HandlerArgs, esp_event_base_t Base, int32_t ID, void *p_Data)
 {
-    if(ID == SNTP_EVENT_SNTP_SYNCED) {
+    if (ID == SNTP_EVENT_SNTP_SYNCED) {
         struct timeval *p_TimeVal = (struct timeval *)p_Data;
         struct tm TimeInfo;
 
@@ -99,10 +99,10 @@ static void _TimeManager_on_Event(void *p_HandlerArgs, esp_event_base_t Base, in
 
         _TimeManager_State.isNTPSynced = true;
         _TimeManager_State.last_sync_time = p_TimeVal->tv_sec;
-        
+
         /* Save last sync time to NVS */
         save_last_sync_time(_TimeManager_State.last_sync_time);
-        
+
         ESP_LOGI(TAG, "Time synced via SNTP: %04d-%02d-%02d %02d:%02d:%02d",
                  TimeInfo.tm_year + 1900, TimeInfo.tm_mon + 1, TimeInfo.tm_mday,
                  TimeInfo.tm_hour, TimeInfo.tm_min, TimeInfo.tm_sec);
@@ -124,7 +124,6 @@ esp_err_t TimeManager_Init(const TimeManager_Config_t *p_Config)
         return ESP_OK;
     }
 
-    /* Open NVS */
     Error = nvs_open(TIMEMANAGER_NVS_NAMESPACE, NVS_READWRITE, &_TimeManager_State.NVS_Handle);
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to open NVS: %d!", Error);
@@ -136,7 +135,7 @@ esp_err_t TimeManager_Init(const TimeManager_Config_t *p_Config)
     Error = nvs_get_i64(_TimeManager_State.NVS_Handle, TIMEMANAGER_NVS_LAST_SYNC, &last_sync);
     if (Error == ESP_OK) {
         _TimeManager_State.last_sync_time = (time_t)last_sync;
-        ESP_LOGI(TAG, "Last SNTP sync loaded from NVS: %ld", (long)_TimeManager_State.last_sync_time);
+        ESP_LOGI(TAG, "Last SNTP sync loaded from NVS: %ld", static_cast<long>(_TimeManager_State.last_sync_time));
     } else if (Error == ESP_ERR_NVS_NOT_FOUND) {
         _TimeManager_State.last_sync_time = 0;
         ESP_LOGI(TAG, "No previous SNTP sync found in NVS");
@@ -259,7 +258,7 @@ esp_err_t TimeManager_SetTime(const struct tm *p_TimeInfo, bool SyncRTC)
     time_t t = mktime(&temp);
 
     if (t == -1) {
-        ESP_LOGE(TAG, "Invalid time");
+        ESP_LOGE(TAG, "Invalid time!");
 
         return ESP_ERR_INVALID_ARG;
     }
@@ -350,10 +349,10 @@ esp_err_t TimeManager_SyncFromSNTP(uint32_t TimeoutMs)
     do {
         vTaskDelay(pdMS_TO_TICKS(100));
 
-        if(_TimeManager_State.isNTPSynced) {
+        if (_TimeManager_State.isNTPSynced) {
             return ESP_OK;
         }
-    } while((Timeout > 0) && (Timeout -= 100) > 0);
+    } while ((Timeout > 0) && (Timeout -= 100) > 0);
 
     ESP_LOGW(TAG, "SNTP sync timeout after %lu ms", static_cast<unsigned long>(TimeoutMs));
 
@@ -496,7 +495,7 @@ bool TimeManager_IsSNTPSyncDue(void)
     time_t sync_interval_seconds = _TimeManager_State.sync_interval_days * 24 * 60 * 60;
 
     bool is_due = (time_since_sync >= sync_interval_seconds);
-    
+
     if (is_due) {
         ESP_LOGI(TAG, "SNTP sync due: %ld seconds since last sync (interval: %ld days)",
                  static_cast<long>(time_since_sync), static_cast<long>(_TimeManager_State.sync_interval_days));

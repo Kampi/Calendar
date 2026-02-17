@@ -1,4 +1,4 @@
-/*
+﻿/*
  * eventView.cpp
  *
  *  Copyright (C) Daniel Kampert, 2026
@@ -63,7 +63,7 @@ typedef struct {
  */
 static void event_button_clicked(lv_event_t *e)
 {
-    EventButton_UserData_t *p_UserData = (EventButton_UserData_t*)lv_event_get_user_data(e);
+    EventButton_UserData_t *p_UserData = static_cast<EventButton_UserData_t *>(lv_event_get_user_data(e));
 
     if ((p_UserData == NULL) || (p_UserData->p_ViewHandle == NULL)) {
         return;
@@ -116,7 +116,7 @@ static void create_time_axis(EventView_Handle_t *p_Handle)
 
         uint16_t y_pos = (hour - p_Handle->Config.StartHour) * p_Handle->SlotHeight * EVENT_TIMESLOTS_PER_HOUR;
         lv_obj_set_pos(p_Label, 5, y_pos);
-        lv_obj_set_style_text_font(p_Label, &lv_font_montserrat_12, 0);
+        lv_obj_set_style_text_font(p_Label, &lv_font_montserrat_ext_12, 0);
     }
 }
 
@@ -138,7 +138,7 @@ static void create_day_headers(EventView_Handle_t *p_Handle)
         }
 
         lv_obj_set_pos(p_Header, 50 + (day * col_width) + (col_width / 2) - 30, -25);
-        lv_obj_set_style_text_font(p_Header, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_text_font(p_Header, &lv_font_montserrat_ext_14, 0);
     }
 }
 
@@ -184,8 +184,8 @@ static void create_grid_lines(EventView_Handle_t *p_Handle)
  *  @param p_Height Pointer to receive height
  *  @return         ESP_OK on success, error code otherwise
  */
-static esp_err_t calculate_event_position(EventView_Handle_t *p_Handle, Event_t *p_Event, 
-                                          int16_t *p_X, int16_t *p_Y, 
+static esp_err_t calculate_event_position(EventView_Handle_t *p_Handle, Event_t *p_Event,
+                                          int16_t *p_X, int16_t *p_Y,
                                           uint16_t *p_Width, uint16_t *p_Height)
 {
     struct tm *p_StartTime = localtime(&p_Event->StartTime);
@@ -238,7 +238,7 @@ esp_err_t EventView_Create(EventView_Config_t *p_Config, EventView_Handle_t **pp
         return ESP_ERR_INVALID_ARG;
     }
 
-    p_Handle = (EventView_Handle_t*)malloc(sizeof(EventView_Handle_t));
+    p_Handle = static_cast<EventView_Handle_t *>(malloc(sizeof(EventView_Handle_t)));
     if (p_Handle == NULL) {
         return ESP_ERR_NO_MEM;
     }
@@ -271,9 +271,9 @@ esp_err_t EventView_Create(EventView_Config_t *p_Config, EventView_Handle_t **pp
 
     *pp_Handle = p_Handle;
 
-    ESP_LOGI(TAG, "Event view created (Slot height: %d px, Visible slots: %d)", 
+    ESP_LOGI(TAG, "Event view created (Slot height: %d px, Visible slots: %d)",
              p_Handle->SlotHeight, p_Handle->VisibleSlotCount);
-    
+
     return ESP_OK;
 }
 
@@ -339,18 +339,18 @@ esp_err_t EventView_Update(EventView_Handle_t *p_Handle)
             lv_label_set_long_mode(p_Label, LV_LABEL_LONG_DOT);
             lv_obj_set_width(p_Label, width - 10);
             lv_obj_center(p_Label);
-            lv_obj_set_style_text_font(p_Label, &lv_font_montserrat_12, 0);
+            lv_obj_set_style_text_font(p_Label, &lv_font_montserrat_ext_12, 0);
             lv_obj_set_style_text_color(p_Label, lv_color_hex(0xFFFFFF), 0);
 
             /* Attach event data and click handler */
-            EventButton_UserData_t *p_UserData = (EventButton_UserData_t*)malloc(sizeof(EventButton_UserData_t));
+            EventButton_UserData_t *p_UserData = static_cast<EventButton_UserData_t *>(malloc(sizeof(EventButton_UserData_t)));
             if (p_UserData != NULL) {
                 memcpy(&p_UserData->Event, p_Event, sizeof(Event_t));
                 p_UserData->p_ViewHandle = p_Handle;
                 lv_obj_add_event_cb(p_EventBtn, event_button_clicked, LV_EVENT_CLICKED, p_UserData);
             }
 
-            ESP_LOGD(TAG, "Created event button: %s at (%d, %d) size (%d x %d)", 
+            ESP_LOGD(TAG, "Created event button: %s at (%d, %d) size (%d x %d)",
                      p_Event->Title, x, y, width, height);
         } else {
             ESP_LOGD(TAG, "Event outside visible range: %s", p_Event->Title);
@@ -362,8 +362,8 @@ esp_err_t EventView_Update(EventView_Handle_t *p_Handle)
     return ESP_OK;
 }
 
-esp_err_t EventView_SetClickCallback(EventView_Handle_t *p_Handle, 
-                                     EventView_ClickCallback_t Callback, 
+esp_err_t EventView_SetClickCallback(EventView_Handle_t *p_Handle,
+                                     EventView_ClickCallback_t Callback,
                                      void *p_UserData)
 {
     if (p_Handle == NULL) {
@@ -381,8 +381,8 @@ esp_err_t EventView_ShowEventDetails(Event_t *p_Event)
     lv_obj_t *p_Popup;
     lv_obj_t *p_Label;
     char buffer[512];
-    struct tm *p_StartTime;
-    struct tm *p_EndTime;
+    struct tm StartTime;
+    struct tm EndTime;
 
     if (p_Event == NULL) {
         return ESP_ERR_INVALID_ARG;
@@ -392,9 +392,10 @@ esp_err_t EventView_ShowEventDetails(Event_t *p_Event)
     p_Popup = lv_msgbox_create(NULL);
     lv_msgbox_add_title(p_Popup, "Termin Details");
 
-    /* Format event details */
-    p_StartTime = localtime(&p_Event->StartTime);
-    p_EndTime = localtime(&p_Event->EndTime);
+    /* Use localtime_r to fill separate structs – localtime() shares a static
+     * buffer and the second call would overwrite the first result. */
+    localtime_r(&p_Event->StartTime, &StartTime);
+    localtime_r(&p_Event->EndTime, &EndTime);
 
     snprintf(buffer, sizeof(buffer),
              "Titel: %s\n\n"
@@ -404,8 +405,8 @@ esp_err_t EventView_ShowEventDetails(Event_t *p_Event)
              "%s%s%s",
              p_Event->Title,
              p_Event->Calendar,
-             p_StartTime->tm_hour, p_StartTime->tm_min,
-             p_EndTime->tm_hour, p_EndTime->tm_min,
+             StartTime.tm_hour, StartTime.tm_min,
+             EndTime.tm_hour, EndTime.tm_min,
              p_Event->Location[0] ? "Ort: " : "",
              p_Event->Location,
              p_Event->Description[0] ? "\n\nBeschreibung:\n" : "");
@@ -415,7 +416,7 @@ esp_err_t EventView_ShowEventDetails(Event_t *p_Event)
     }
 
     p_Label = lv_msgbox_add_text(p_Popup, buffer);
-    lv_obj_set_style_text_font(p_Label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(p_Label, &lv_font_montserrat_ext_12, 0);
 
     /* Add close button */
     lv_msgbox_add_close_button(p_Popup);

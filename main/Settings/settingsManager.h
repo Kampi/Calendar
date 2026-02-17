@@ -71,6 +71,6 @@ esp_err_t SettingsManager_GetCalDAV(App_Settings_CalDAV_t* p_Settings);
 /** @brief              Get the list of calendars to fetch from the Settings Manager RAM.
  *  @param p_Calendars  Pointer to the calendars to fetch
 */
-void SettingsManager_GetCalendars(std::list<std::string>* p_Calendars);
+void SettingsManager_GetCalendars(std::list<std::string> *p_Calendars);
 
 #endif /* SETTINGS_MANAGER_H_ */

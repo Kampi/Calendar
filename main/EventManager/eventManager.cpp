@@ -50,6 +50,53 @@ static EventManager_State_t _State = {
     .Mutex = NULL
 };
 
+/** @brief          Check if iCalendar date/time string is a DATE (all-day event).
+ *  @param p_DateTimeStr  iCalendar date/time string
+ *  @return         true if DATE format (YYYYMMDD), false if DATETIME format
+ */
+static bool is_icalendar_date_format(const char *p_DateTimeStr)
+{
+    if (p_DateTimeStr == NULL) {
+        return false;
+    }
+
+    /* Check for DATE format: YYYYMMDD (8 characters)
+     * DATETIME format contains 'T': YYYYMMDDTHHMMSSZ (at least 15 characters)
+     * Also check for VALUE=DATE parameter in the string
+     */
+    const char *p_ValueDate = strstr(p_DateTimeStr, "VALUE=DATE");
+    if (p_ValueDate != NULL) {
+        return true;
+    }
+
+    /* Look for the actual date value after colons */
+    const char *p_Value = strrchr(p_DateTimeStr, ':');
+    if (p_Value != NULL) {
+        p_Value++;  /* Skip the ':' */
+    } else {
+        p_Value = p_DateTimeStr;
+    }
+
+    /* Check if there's no 'T' separator (DATE format) */
+    return (strchr(p_Value, 'T') == NULL) && (strlen(p_Value) == 8);
+}
+
+/** @brief          Portable replacement for timegm(): converts a UTC struct tm to a Unix timestamp.
+ *                  mktime() treats the struct as local time, so the UTC offset is added back.
+ *  @param p_Tm     Pointer to struct tm with UTC values
+ *  @return         Unix timestamp (seconds since 1970-01-01 00:00:00 UTC)
+ */
+static time_t portable_timegm(struct tm *p_Tm)
+{
+    time_t t = mktime(p_Tm);
+    struct tm utc;
+    gmtime_r(&t, &utc);
+    utc.tm_isdst = 0;
+    time_t t_utc = mktime(&utc);
+
+    return t + (t - t_utc);
+}
+
 /** @brief          Parse iCalendar datetime string to Unix timestamp.
  *  @param p_DateTimeStr iCalendar datetime string (e.g., "20260125T100000Z")
  *  @return         Unix timestamp, or 0 on error
@@ -57,17 +104,50 @@ static EventManager_State_t _State = {
 static time_t parse_icalendar_datetime(const char *p_DateTimeStr)
 {
     struct tm tm_time;
+    const char *p_Value;
 
     if (p_DateTimeStr == NULL) {
         return 0;
     }
 
-    /* Parse iCalendar format: YYYYMMDDTHHMMSSZ */
-    if (sscanf(p_DateTimeStr, "%4d%2d%2dT%2d%2d%2d",
+    /* Extract value after last colon (handles "DTSTART:20260201" or "DTSTART;VALUE=DATE:20260201") */
+    p_Value = strrchr(p_DateTimeStr, ':');
+    if (p_Value != NULL) {
+        p_Value++;  /* Skip the ':' */
+    } else {
+        p_Value = p_DateTimeStr;
+    }
+
+    memset(&tm_time, 0, sizeof(struct tm));
+
+    /* Try parsing DATETIME format first: YYYYMMDDTHHMMSSZ */
+    if (sscanf(p_Value, "%4d%2d%2dT%2d%2d%2d",
                &tm_time.tm_year, &tm_time.tm_mon, &tm_time.tm_mday,
                &tm_time.tm_hour, &tm_time.tm_min, &tm_time.tm_sec) == 6) {
         tm_time.tm_year -= 1900;  /* Years since 1900 */
         tm_time.tm_mon -= 1;      /* Months since January (0-11) */
+
+        /* Check for UTC 'Z' suffix - use timegm() so the values are treated as
+         * UTC instead of local time, avoiding a timezone-offset error.
+         * Events stored with TZID (no 'Z') are already in local time → mktime(). */
+        if (strchr(p_Value, 'Z') != NULL) {
+            tm_time.tm_isdst = 0;
+            return portable_timegm(&tm_time);
+        }
+
+        tm_time.tm_isdst = -1;    /* Let mktime determine DST */
+
+        return mktime(&tm_time);
+    }
+
+    /* Try parsing DATE format: YYYYMMDD (all-day events) */
+    if (sscanf(p_Value, "%4d%2d%2d",
+               &tm_time.tm_year, &tm_time.tm_mon, &tm_time.tm_mday) == 3) {
+        tm_time.tm_year -= 1900;  /* Years since 1900 */
+        tm_time.tm_mon -= 1;      /* Months since January (0-11) */
+        tm_time.tm_hour = 0;      /* Midnight */
+        tm_time.tm_min = 0;
+        tm_time.tm_sec = 0;
         tm_time.tm_isdst = -1;    /* Let mktime determine DST */
 
         return mktime(&tm_time);
@@ -76,7 +156,68 @@ static time_t parse_icalendar_datetime(const char *p_DateTimeStr)
     return 0;
 }
 
-/** @brief          Convert German umlauts to ASCII equivalents for display.
+/** @brief          Parse iCalendar DURATION string (e.g. "PT1H30M") to seconds.
+ *                  Supports weeks (W), days (D), hours (H), minutes (M) and seconds (S).
+ *  @param p_DurationStr iCalendar DURATION value string
+ *  @return         Duration in seconds, or 0 on error
+ */
+static time_t parse_icalendar_duration(const char *p_DurationStr)
+{
+    const char *p;
+    int64_t TotalSeconds = 0;
+    int64_t n = 0;
+    bool InTime = false;
+
+    if (p_DurationStr == NULL) {
+        return 0;
+    }
+
+    p = p_DurationStr;
+
+    /* Skip optional sign and 'P' designator */
+    if ((*p == '+') || (*p == '-')) {
+        p++;
+    }
+
+    if (*p == 'P') {
+        p++;
+    }
+
+    while (*p) {
+        if (*p == 'T') {
+            InTime = true;
+            p++;
+            continue;
+        }
+
+        if ((*p >= '0') && (*p <= '9')) {
+            n = n * 10 + (*p - '0');
+        } else if (*p == 'W') {
+            TotalSeconds += n * 7 * 24 * 3600;
+            n = 0;
+        } else if (*p == 'D') {
+            TotalSeconds += n * 24 * 3600;
+            n = 0;
+        } else if ((*p == 'H') && InTime) {
+            TotalSeconds += n * 3600;
+            n = 0;
+        } else if ((*p == 'M') && InTime) {
+            TotalSeconds += n * 60;
+            n = 0;
+        } else if ((*p == 'S') && InTime) {
+            TotalSeconds += n;
+            n = 0;
+        }
+
+        p++;
+    }
+
+    return static_cast<time_t>(TotalSeconds);
+}
+
+/** @brief          Copy UTF-8 string into destination buffer (bounded, UTF-8-safe).
+ *                  Passes all characters through as-is so LVGL can render umlauts
+ *                  directly using the extended font glyphs.
  *  @param p_Dest   Destination buffer
  *  @param p_Src    Source string with UTF-8 characters
  *  @param MaxLen   Maximum length of destination buffer
@@ -91,71 +232,34 @@ static void convert_german_chars(char *p_Dest, const char *p_Src, size_t MaxLen)
     }
 
     while (*p_Src_u && (DestIdx < MaxLen - 1)) {
-        /* Check for UTF-8 multi-byte sequences */
-        if ((*p_Src_u == 0xC3) && (p_Src_u[1] != 0)) {
-            /* Latin-1 Supplement (U+0080 to U+00FF) */
-            switch (p_Src_u[1]) {
-                case 0x9F: /* ß -> ss */
-                    if (DestIdx < MaxLen - 2) {
-                        p_Dest[DestIdx++] = 's';
-                        p_Dest[DestIdx++] = 's';
-                    }
-                    break;
-                case 0xA4: /* ä -> ae */
-                    if (DestIdx < MaxLen - 2) {
-                        p_Dest[DestIdx++] = 'a';
-                        p_Dest[DestIdx++] = 'e';
-                    }
-                    break;
-                case 0xB6: /* ö -> oe */
-                    if (DestIdx < MaxLen - 2) {
-                        p_Dest[DestIdx++] = 'o';
-                        p_Dest[DestIdx++] = 'e';
-                    }
-                    break;
-                case 0xBC: /* ü -> ue */
-                    if (DestIdx < MaxLen - 2) {
-                        p_Dest[DestIdx++] = 'u';
-                        p_Dest[DestIdx++] = 'e';
-                    }
-                    break;
-                case 0x84: /* Ä -> Ae */
-                    if (DestIdx < MaxLen - 2) {
-                        p_Dest[DestIdx++] = 'A';
-                        p_Dest[DestIdx++] = 'e';
-                    }
-                    break;
-                case 0x96: /* Ö -> Oe */
-                    if (DestIdx < MaxLen - 2) {
-                        p_Dest[DestIdx++] = 'O';
-                        p_Dest[DestIdx++] = 'e';
-                    }
-                    break;
-                case 0x9C: /* Ü -> Ue */
-                    if (DestIdx < MaxLen - 2) {
-                        p_Dest[DestIdx++] = 'U';
-                        p_Dest[DestIdx++] = 'e';
-                    }
-                    break;
-                default:
-                    /* Unknown character, copy as-is or skip */
-                    p_Dest[DestIdx++] = '?';
-                    break;
-            }
-            p_Src_u += 2;  /* Skip the 2-byte UTF-8 sequence */
-        } else if (*p_Src_u < 0x80) {
-            /* ASCII character */
-            p_Dest[DestIdx++] = *p_Src_u;
-            p_Src_u++;
+        /* Determine byte length of current UTF-8 sequence */
+        size_t SeqLen;
+
+        if (*p_Src_u < 0x80) {
+            SeqLen = 1;
+        } else if ((*p_Src_u & 0xE0) == 0xC0) {
+            SeqLen = 2;
+        } else if ((*p_Src_u & 0xF0) == 0xE0) {
+            SeqLen = 3;
+        } else if ((*p_Src_u & 0xF8) == 0xF0) {
+            SeqLen = 4;
         } else {
-            /* Other multi-byte UTF-8 character, skip or replace */
-            p_Dest[DestIdx++] = '?';
-            /* Skip the rest of the UTF-8 sequence */
-            if ((*p_Src_u & 0xE0) == 0xC0) p_Src_u += 2;
-            else if ((*p_Src_u & 0xF0) == 0xE0) p_Src_u += 3;
-            else if ((*p_Src_u & 0xF8) == 0xF0) p_Src_u += 4;
-            else p_Src_u++;
+            /* Invalid UTF-8 start byte, skip */
+            p_Src_u++;
+            continue;
         }
+
+        /* Only copy if the complete sequence fits in the buffer */
+        if ((DestIdx + SeqLen) < MaxLen) {
+            for (size_t j = 0; j < SeqLen; j++) {
+                if (p_Src_u[j] == 0) {
+                    break;  /* Premature end of string */
+                }
+                p_Dest[DestIdx++] = static_cast<char>(p_Src_u[j]);
+            }
+        }
+
+        p_Src_u += SeqLen;  /* Advance past the UTF-8 sequence */
     }
 
     p_Dest[DestIdx] = '\0';
@@ -173,7 +277,7 @@ static esp_err_t add_event_to_list(Event_t *p_Event)
         return ESP_ERR_INVALID_ARG;
     }
 
-    p_Node = (Event_Node_t *)malloc(sizeof(Event_Node_t));
+    p_Node = static_cast<Event_Node_t *>(malloc(sizeof(Event_Node_t)));
     if (p_Node == NULL) {
         return ESP_ERR_NO_MEM;
     }
@@ -323,10 +427,10 @@ esp_err_t EventManager_LoadEvents(CalDAV_Client_t *p_Client, struct tm *p_Start,
         CalDAV_Calendar_Event_t *p_Events = NULL;
         size_t EventCount = 0;
 
-        Error_CalDAV = CalDAV_Calendar_Events_List(p_Client, &p_Events, &EventCount, 
+        Error_CalDAV = CalDAV_Calendar_Events_List(p_Client, &p_Events, &EventCount,
                                                    p_Calendar->Path, &start_utc, &end_utc);
         if (Error_CalDAV != CALDAV_ERROR_OK) {
-            ESP_LOGE(TAG, "Failed to load events from calendar '%s' (Error: %d)", 
+            ESP_LOGE(TAG, "Failed to load events from calendar '%s' (Error: %d)",
                      p_CalendarName, Error_CalDAV);
             continue;
         }
@@ -357,15 +461,29 @@ esp_err_t EventManager_LoadEvents(CalDAV_Client_t *p_Client, struct tm *p_Start,
             strncpy(Event.Calendar, p_CalendarName, sizeof(Event.Calendar) - 1);
 
             /* Parse times */
-            ESP_LOGD(TAG, "Parsing event '%s': StartTime='%s', EndTime='%s'", 
-                     Event.Title, 
+            ESP_LOGD(TAG, "Parsing event '%s': StartTime='%s', EndTime='%s', Duration='%s'",
+                     Event.Title,
                      p_Events[i].StartTime ? p_Events[i].StartTime : "NULL",
-                     p_Events[i].EndTime ? p_Events[i].EndTime : "NULL");
+                     p_Events[i].EndTime ? p_Events[i].EndTime : "NULL",
+                     p_Events[i].Duration ? p_Events[i].Duration : "NULL");
             Event.StartTime = parse_icalendar_datetime(p_Events[i].StartTime);
             Event.EndTime = parse_icalendar_datetime(p_Events[i].EndTime);
 
-            /* TODO: Detect all-day events */
-            Event.isAllDay = false;
+            /* Fallback: compute end time from DURATION when DTEND is absent (RFC 5545 allows either) */
+            if ((Event.EndTime == 0) && (Event.StartTime != 0) && (p_Events[i].Duration != NULL)) {
+                time_t Duration = parse_icalendar_duration(p_Events[i].Duration);
+                if (Duration > 0) {
+                    Event.EndTime = Event.StartTime + Duration;
+                    ESP_LOGD(TAG, "Event '%s': computed EndTime from DURATION '%s' (%ld s)",
+                             Event.Title, p_Events[i].Duration, (long)Duration);
+                }
+            }
+
+            /* Detect all-day events by checking if DTSTART uses DATE format */
+            Event.isAllDay = is_icalendar_date_format(p_Events[i].StartTime);
+
+            ESP_LOGD(TAG, "Event '%s' detected as %s (StartTime format check)",
+                     Event.Title, Event.isAllDay ? "ALL-DAY" : "TIMED");
 
             /* Add to internal list */
             xSemaphoreTake(_State.Mutex, portMAX_DELAY);
@@ -375,7 +493,7 @@ esp_err_t EventManager_LoadEvents(CalDAV_Client_t *p_Client, struct tm *p_Start,
             if (Error != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to add event to list: %s", Event.Title);
             } else {
-                ESP_LOGD(TAG, "Added event: %s (Start: %ld, End: %ld)", 
+                ESP_LOGD(TAG, "Added event: %s (Start: %ld, End: %ld)",
                          Event.Title, Event.StartTime, Event.EndTime);
             }
         }
@@ -426,7 +544,7 @@ esp_err_t EventManager_GetEventsForSlot(TimeSlot_Index_t *p_Slot, Event_List_t *
     SlotEndT = SlotStartT + (EVENT_TIMESLOT_MINUTES * 60);
 
     /* Create filtered list */
-    p_FilteredList = (Event_List_t *)malloc(sizeof(Event_List_t));
+    p_FilteredList = static_cast<Event_List_t *>(malloc(sizeof(Event_List_t)));
     if (p_FilteredList == NULL) {
         return ESP_ERR_NO_MEM;
     }
@@ -443,7 +561,7 @@ esp_err_t EventManager_GetEventsForSlot(TimeSlot_Index_t *p_Slot, Event_List_t *
 
         /* Check if event overlaps with this timeslot */
         if ((p_Event->StartTime < SlotEndT) && (p_Event->EndTime > SlotStartT)) {
-            Event_Node_t *p_NewNode = (Event_Node_t *)malloc(sizeof(Event_Node_t));
+            Event_Node_t *p_NewNode = static_cast<Event_Node_t *>(malloc(sizeof(Event_Node_t)));
             if (p_NewNode != NULL) {
                 memcpy(&p_NewNode->Event, p_Event, sizeof(Event_t));
                 p_NewNode->p_Next = p_FilteredList->p_Head;

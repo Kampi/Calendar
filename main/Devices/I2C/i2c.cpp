@@ -120,7 +120,8 @@ int32_t I2CM_Read(i2c_master_dev_handle_t *p_Dev_Handle, uint8_t *p_Data, uint32
     return Error;
 }
 
-int32_t I2CM_WriteRead(i2c_master_dev_handle_t *p_Dev_Handle, const uint8_t *p_Write_Data, uint32_t Write_Length, uint8_t *p_Read_Data, uint32_t Read_Length)
+int32_t I2CM_WriteRead(i2c_master_dev_handle_t *p_Dev_Handle, const uint8_t *p_Write_Data, uint32_t Write_Length,
+                       uint8_t *p_Read_Data, uint32_t Read_Length)
 {
     esp_err_t Error;
 
@@ -132,7 +133,8 @@ int32_t I2CM_WriteRead(i2c_master_dev_handle_t *p_Dev_Handle, const uint8_t *p_W
         return ESP_ERR_INVALID_ARG;
     }
 
-    ESP_LOGD(TAG, "WriteRead: Write %u bytes, Read %u bytes", static_cast<unsigned int>(Write_Length), static_cast<unsigned int>(Read_Length));
+    ESP_LOGD(TAG, "WriteRead: Write %u bytes, Read %u bytes", static_cast<unsigned int>(Write_Length),
+             static_cast<unsigned int>(Read_Length));
 
     Error = ESP_FAIL;
 

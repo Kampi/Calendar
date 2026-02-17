@@ -46,6 +46,76 @@ esp_err_t MyFunction(uint8_t *p_Buffer, size_t Size)
 }
 ```
 
+### Type Casting
+
+**Always use C++ style casts** instead of C-style casts. C++ casts are more explicit, safer, and easier to search for in code.
+
+#### Cast Types
+
+- **`static_cast<T>()`** - Use for safe, well-defined conversions:
+  - Casting between numeric types: `static_cast<uint8_t>(value)`
+  - Casting `void*` from `malloc()` to typed pointer: `static_cast<MyType *>(malloc(...))`
+  - Upcasting in class hierarchies (when applicable)
+  - Explicit conversions where implicit conversion would work
+  
+  **Example:**
+  ```cpp
+  Event_Node_t *p_Node = static_cast<Event_Node_t *>(malloc(sizeof(Event_Node_t)));
+  uint8_t value = static_cast<uint8_t>(largerValue & 0xFF);
+  ```
+
+- **`reinterpret_cast<T>()`** - Use for low-level, potentially unsafe conversions:
+  - Converting between unrelated pointer types: `uint8_t*` ↔ `char*`
+  - Casting pointers to integers or vice versa
+  - Reinterpreting binary data representations
+  - Hardware register access or memory-mapped I/O
+  
+  **Example:**
+  ```cpp
+  strcpy(reinterpret_cast<char *>(WiFiConfig.sta.ssid), SSID);
+  uint16_t *p_Data = reinterpret_cast<uint16_t *>(&buffer[offset]);
+  ```
+
+- **`const_cast<T>()`** - Use to add or remove `const` qualifier:
+  - Only when absolutely necessary (e.g., interfacing with C APIs that don't use `const`)
+  - Prefer refactoring to avoid when possible
+  
+  **Example:**
+  ```cpp
+  /* Only when interfacing with API that should accept const but doesn't */
+  legacy_api(const_cast<char *>(constString));
+  ```
+
+- **`dynamic_cast<T>()`** - Use for runtime type checking in polymorphic hierarchies:
+  - Requires RTTI (Runtime Type Information)
+  - Not commonly used in embedded ESP-IDF projects due to overhead
+  - Only applicable with virtual functions and inheritance
+  
+  **Note:** This project typically avoids `dynamic_cast` due to embedded constraints.
+
+#### Migration from C-Style Casts
+
+❌ **Don't use C-style casts:**
+```cpp
+p_Node = (Event_Node_t *)malloc(sizeof(Event_Node_t));           // Bad
+s16 = (uint16_t *)&px_map[offset];                               // Bad
+return (*(int *)a - *(int *)b);                                  // Bad
+```
+
+✅ **Use C++ style casts:**
+```cpp
+p_Node = static_cast<Event_Node_t *>(malloc(sizeof(Event_Node_t)));        // Good
+s16 = reinterpret_cast<uint16_t *>(&px_map[offset]);                       // Good
+return (*static_cast<const int *>(a) - *static_cast<const int *>(b));      // Good
+```
+
+#### Guidelines
+
+- **Search for casts:** C++ casts are easier to find with regex: `grep "static_cast\|reinterpret_cast"`
+- **Document unsafe casts:** Add comments explaining why `reinterpret_cast` is needed
+- **Minimize casting:** Design APIs to reduce the need for casts when possible
+- **Const correctness:** Use proper const qualifiers to avoid needing `const_cast`
+
 ### Naming Conventions
 
 #### Functions
@@ -624,6 +694,7 @@ Documentation is automatically built and deployed via GitHub Actions workflow (`
 - Use blocking operations in ISRs
 - Ignore compiler warnings
 - Commit code without verifying it compiles
+- Use C-style casts instead of C++ casts
 
 ✅ **Do:**
 - Use consistent naming conventions
@@ -633,6 +704,7 @@ Documentation is automatically built and deployed via GitHub Actions workflow (`
 - Use appropriate log levels
 - Clean up resources on failure
 - Follow the established module patterns
+- Use C++ style casts (static_cast, reinterpret_cast, const_cast) instead of C-style casts
 - **Update corresponding AsciiDoc documentation when changing code**
 - **Verify code compiles and links before committing**
 

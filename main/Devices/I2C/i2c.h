@@ -74,7 +74,8 @@ int32_t I2CM_Read(i2c_master_dev_handle_t *p_Dev_Handle, uint8_t *p_Data, uint32
  *                      ESP_ERR_INVALID_ARG when an invalid argument is passed into the function
  *                      ESP_ERR_INVALID_STATE when the I2C interface isn´t initialized
  */
-int32_t I2CM_WriteRead(i2c_master_dev_handle_t *p_Dev_Handle, const uint8_t *p_Write_Data, uint32_t Write_Length, uint8_t *p_Read_Data, uint32_t Read_Length);
+int32_t I2CM_WriteRead(i2c_master_dev_handle_t *p_Dev_Handle, const uint8_t *p_Write_Data, uint32_t Write_Length,
+                       uint8_t *p_Read_Data, uint32_t Read_Length);
 
 /** @brief              Modify the content of a register.
  *  @param p_Dev_Handle Pointer to I2C device handle
