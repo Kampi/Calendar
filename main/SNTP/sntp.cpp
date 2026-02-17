@@ -51,7 +51,9 @@ esp_err_t SNTP_Init(const char* p_Timezone, const char* p_Server, uint32_t SyncI
     SNTP_SetTimezone(p_Timezone);
 
     /* Setup automatic sync timer if interval is specified */
-    esp_sntp_set_sync_interval(3600);
+    if (SyncInterval > 0) {
+        esp_sntp_set_sync_interval(SyncInterval);
+    }
 
     return ESP_OK;
 }

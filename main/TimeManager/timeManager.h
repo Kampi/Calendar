@@ -46,9 +46,15 @@ typedef struct {
 
 /** @brief          Initialize time manager
  *  @param p_Config Pointer to p_Configuration structure
+ *  @param SkipSNTP If true, skip SNTP initialization (useful if WiFi is not available)
  *  @return         ESP_OK on success
  */
 esp_err_t TimeManager_Init(const TimeManager_Config_t *p_Config);
+
+/** @brief  Initialize SNTP client (must be called after WiFi is connected)
+ *  @return ESP_OK on success
+ */
+esp_err_t TimeManager_InitSNTP(void);
 
 /** @brief  Deinitialize time manager
  *  @return ESP_OK on success
@@ -112,5 +118,15 @@ esp_err_t TimeManager_ClearAlarmFlag(void);
  *  @return true if alarm flag is set
  */
 bool TimeManager_IsAlarmActive(void);
+
+/** @brief  Check if SNTP sync is due based on sync interval.
+ *  @return true if sync is needed
+ */
+bool TimeManager_IsSNTPSyncDue(void);
+
+/** @brief  Check if RTC has valid time (VL flag clear).
+ *  @return true if RTC time is valid
+ */
+bool TimeManager_IsRTCValid(void);
 
 #endif /* TIMEMANAGER_H_ */
