@@ -1,3 +1,6 @@
 [submodule "components/FastEPD"]
 	path = components/FastEPD
 	url = https://github.com/bitbank2/FastEPD.git
+[submodule "components/ESP32-CalDAV"]
+	path = components/ESP32-CalDAV
+	url = https://github.com/Kampi/ESP32-CalDAV
