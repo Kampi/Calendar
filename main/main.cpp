@@ -49,26 +49,26 @@
 #include "Devices/devices.h"
 #include "Settings/settingsManager.h"
 
-#define GUI_DRAW_BUFFER_SIZE                (((CONFIG_GUI_WIDTH * CONFIG_GUI_HEIGHT) / 10 * LV_COLOR_DEPTH) / 8)
+#define GUI_DRAW_BUFFER_SIZE                ((((CONFIG_GUI_WIDTH * CONFIG_GUI_HEIGHT) / 10 * LV_COLOR_DEPTH) / 8) + 8)
 
 #ifdef CONFIG_GUI_VIEW_LIST
-    #define GUI_VIEW_CREATE(...)            UI_DayView_Create(__VA_ARGS__)
-    #define GUI_VIEW_UPDATE_HEADER(...)     UI_DayView_Update_Header(__VA_ARGS__)
-    #define GUI_VIEW_UPDATE_BATTERY(...)    UI_DayView_Update_Battery(__VA_ARGS__)
-    #define GUI_VIEW_UPDATE_RSSI(...)       UI_DayView_Update_RSSI(__VA_ARGS__)
-    #define GUI_VIEW_ADD_EVENT(...)         UI_DayView_Add_Event(__VA_ARGS__)
-    #define GUI_VIEW_CLEAR_EVENTS(...)      UI_DayView_Clear_Events(__VA_ARGS__)
-    #define GUI_VIEW_DESTROY(...)           UI_DayView_Destroy(__VA_ARGS__)
+#define GUI_VIEW_CREATE(...)            UI_DayView_Create(__VA_ARGS__)
+#define GUI_VIEW_UPDATE_HEADER(...)     UI_DayView_Update_Header(__VA_ARGS__)
+#define GUI_VIEW_UPDATE_BATTERY(...)    UI_DayView_Update_Battery(__VA_ARGS__)
+#define GUI_VIEW_UPDATE_RSSI(...)       UI_DayView_Update_RSSI(__VA_ARGS__)
+#define GUI_VIEW_ADD_EVENT(...)         UI_DayView_Add_Event(__VA_ARGS__)
+#define GUI_VIEW_CLEAR_EVENTS(...)      UI_DayView_Clear_Events(__VA_ARGS__)
+#define GUI_VIEW_DESTROY(...)           UI_DayView_Destroy(__VA_ARGS__)
 #elif CONFIG_GUI_VIEW_CALENDAR
-    #define GUI_VIEW_CREATE(...)            UI_Dashboard_Create(__VA_ARGS__)
-    #define GUI_VIEW_UPDATE_HEADER(...)     UI_Dashboard_Update_Header(__VA_ARGS__)
-    #define GUI_VIEW_UPDATE_BATTERY(...)    UI_Dashboard_Update_Battery(__VA_ARGS__)
-    #define GUI_VIEW_UPDATE_RSSI(...)       UI_Dashboard_Update_RSSI(__VA_ARGS__)
-    #define GUI_VIEW_ADD_EVENT(...)         UI_Dashboard_Add_Event(__VA_ARGS__)
-    #define GUI_VIEW_CLEAR_EVENTS(...)      UI_Dashboard_Clear_Events(__VA_ARGS__)
-    #define GUI_VIEW_DESTROY(...)           UI_Dashboard_Destroy(__VA_ARGS__)
+#define GUI_VIEW_CREATE(...)            UI_Dashboard_Create(__VA_ARGS__)
+#define GUI_VIEW_UPDATE_HEADER(...)     UI_Dashboard_Update_Header(__VA_ARGS__)
+#define GUI_VIEW_UPDATE_BATTERY(...)    UI_Dashboard_Update_Battery(__VA_ARGS__)
+#define GUI_VIEW_UPDATE_RSSI(...)       UI_Dashboard_Update_RSSI(__VA_ARGS__)
+#define GUI_VIEW_ADD_EVENT(...)         UI_Dashboard_Add_Event(__VA_ARGS__)
+#define GUI_VIEW_CLEAR_EVENTS(...)      UI_Dashboard_Clear_Events(__VA_ARGS__)
+#define GUI_VIEW_DESTROY(...)           UI_Dashboard_Destroy(__VA_ARGS__)
 #else
-    #error "No GUI view defined!"
+#error "No GUI view defined!"
 #endif
 
 static CalDAV_Client_t Client;
@@ -79,8 +79,8 @@ static esp_lcd_touch_handle_t Touch_Handle;
 static esp_lcd_panel_io_handle_t IO_Handle;
 static lv_indev_t *Touch;
 static lv_display_t *Display;
-static lv_obj_t* Screen_Status;
-static lv_obj_t* Screen_Dashboard;
+static lv_obj_t *Screen_Status;
+static lv_obj_t *Screen_Dashboard;
 static i2c_master_bus_handle_t I2C_Bus_Handle;
 static i2c_master_bus_config_t I2CM_Config = {
     .i2c_port = I2C_NUM_0,
@@ -154,6 +154,7 @@ static const char *TAG = "main";
 /** @brief          Flush function to copy the rendered content to the e-paper display.
  *                  This function is called by LVGL when a portion of the display needs to be updated.
  *                  Based on the FastEPD library LVGL example.
+ *                  https://github.com/bitbank2/bb_lvgl/blob/main/FastEPD_touch_demo/FastEPD_touch_demo.ino
  *  @param disp
  *  @param area
  *  @param px_map
@@ -175,9 +176,11 @@ static void epaper_display_flush(lv_display_t *disp, const lv_area_t *area, uint
         iBottom = area->y2;
     }
 
+    px_map += 8;
+
     if (epaper.getMode() == BB_MODE_1BPP) {
         for (uint32_t y = 0; y < lv_area_get_height(area); y++) {
-            s16 = (uint16_t *)&px_map[y * lv_area_get_width(area) * 2];
+            s16 = reinterpret_cast<uint16_t *>(&px_map[y * lv_area_get_width(area) * 2]);
             d = epaper.currentBuffer();
             d += ((y + area->y1) * ((epaper.width() + 7) / 8)) + (area->x1 >> 3);
 
@@ -217,7 +220,7 @@ static void epaper_display_flush(lv_display_t *disp, const lv_area_t *area, uint
         for (uint32_t y = 0; y < lv_area_get_height(area); y++) {
             d = epaper.currentBuffer();
             d += ((y + area->y1) * ((epaper.width() + 1) / 2)) + (area->x1 >> 1);
-            s16 = (uint16_t *)&px_map[y * lv_area_get_width(area) * 2];
+            s16 = reinterpret_cast<uint16_t *>(&px_map[y * lv_area_get_width(area) * 2]);
 
             for (uint32_t x = 0; x < lv_area_get_width(area); x += 2) { // work in pairs of pixels
                 u16 = *s16++;
@@ -238,7 +241,7 @@ static void epaper_display_flush(lv_display_t *disp, const lv_area_t *area, uint
     lv_display_flush_ready(disp);
     if (lv_disp_flush_is_last(disp)) {
         ESP_LOGD(TAG, "Final flush - updating display (iTop=%d, iBottom=%d, updates=%d)", iTop, iBottom, iUpdates);
-        
+
         if ((epaper.getMode() == BB_MODE_1BPP) && (iUpdates < 50)) {
             epaper.partialUpdate(true, iTop, iBottom);
         }
@@ -262,7 +265,7 @@ static void on_Touch_Handler(lv_indev_t *p_Indev, lv_indev_data_t *p_Data)
     esp_err_t Error;
 
     Error = esp_lcd_touch_read_data(Touch_Handle);
-    if(Error != ESP_OK) {
+    if (Error != ESP_OK) {
         ESP_LOGE(TAG, "esp_lcd_touch_read_data failed: 0x%x", Error);
 
         p_Data->state = LV_INDEV_STATE_RELEASED;
@@ -271,7 +274,7 @@ static void on_Touch_Handler(lv_indev_t *p_Indev, lv_indev_data_t *p_Data)
     }
 
     Error = esp_lcd_touch_get_data(Touch_Handle, Data, &Count, sizeof(Data) / sizeof(Data[0]));
-    if(Error != ESP_OK) {
+    if (Error != ESP_OK) {
         ESP_LOGE(TAG, "esp_lcd_touch_get_data failed: 0x%x", Error);
 
         p_Data->state = LV_INDEV_STATE_RELEASED;
@@ -279,12 +282,13 @@ static void on_Touch_Handler(lv_indev_t *p_Indev, lv_indev_data_t *p_Data)
         return;
     }
 
-    if(Count > 0) {
+    if (Count > 0) {
+        ESP_LOGD(TAG, "Touch at (%d, %d), strength=%d, points=%d", Data[0].x, Data[0].y, Data[0].strength, Count);
+
         p_Data->point.x = Data[0].y;
         p_Data->point.y = Data[0].x;
         p_Data->state = LV_INDEV_STATE_PRESSED;
 
-        ESP_LOGD(TAG, "Touch at (%d, %d), strength=%d, points=%d", Data[0].x, Data[0].y, Data[0].strength, Count);
         return;
     }
 
@@ -293,8 +297,6 @@ static void on_Touch_Handler(lv_indev_t *p_Indev, lv_indev_data_t *p_Data)
 
 extern "C" void app_main(void)
 {
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-
     esp_err_t Error;
     App_Settings_CalDAV_t CalDAV_Settings;
     App_Settings_WiFi_t WiFi_Settings;
@@ -310,14 +312,14 @@ extern "C" void app_main(void)
 
     SettingsManager_GetWiFi(&WiFi_Settings);
     SettingsManager_GetSystem(&System_Settings);
-    strcpy((char *)TimeManager_Config.Timezone, System_Settings.Timezone);
-    strcpy((char *)TimeManager_Config.NTPServer, System_Settings.NTP_Server);
+    strcpy(reinterpret_cast<char *>(TimeManager_Config.Timezone), System_Settings.Timezone);
+    strcpy(reinterpret_cast<char *>(TimeManager_Config.NTPServer), System_Settings.NTP_Server);
     TimeManager_Config.SyncInterval = System_Settings.NTP_SyncInterval;
 
     SettingsManager_GetCalDAV(&CalDAV_Settings);
-    strcpy((char *)CalDAV_Config.ServerURL, CalDAV_Settings.URL);
-    strcpy((char *)CalDAV_Config.Username, CalDAV_Settings.Username);
-    strcpy((char *)CalDAV_Config.Password, CalDAV_Settings.Password);
+    strcpy(reinterpret_cast<char *>(CalDAV_Config.ServerURL), CalDAV_Settings.URL);
+    strcpy(reinterpret_cast<char *>(CalDAV_Config.Username), CalDAV_Settings.Username);
+    strcpy(reinterpret_cast<char *>(CalDAV_Config.Password), CalDAV_Settings.Password);
     CalDAV_Config.TimeoutMs = CalDAV_Settings.TimeoutMs;
 
     I2CM_Init(&I2CM_Config, &I2C_Bus_Handle);
@@ -353,11 +355,11 @@ extern "C" void app_main(void)
     lv_display_set_rotation(Display, LV_DISPLAY_ROTATION_0);
 
     /* Get and clean the default screen to remove any artifacts */
-    lv_obj_t* default_screen = lv_scr_act();
+    lv_obj_t *default_screen = lv_scr_act();
     lv_obj_remove_style_all(default_screen);
     lv_obj_clean(default_screen);
+    lv_obj_clear_flag(default_screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scrollbar_mode(default_screen, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_set_style_bg_opa(default_screen, LV_OPA_TRANSP, LV_PART_SCROLLBAR);
 
     Screen_Status = UI_Status_Create();
     lv_scr_load(Screen_Status);
@@ -381,7 +383,7 @@ extern "C" void app_main(void)
         /* RTC is valid, sync system time from RTC */
         ESP_LOGI(TAG, "RTC time valid, syncing system time from RTC");
         TimeManager_SyncFromRTC();
-        
+
         /* Check if periodic SNTP sync is due */
         if (TimeManager_IsSNTPSyncDue()) {
             ESP_LOGI(TAG, "Periodic SNTP sync is due");
@@ -417,7 +419,6 @@ extern "C" void app_main(void)
         ESP_LOGI(TAG, "WiFi connected!");
         RSSI = WiFi_GetLastRSSI();
         UI_Status_Update_RSSI(RSSI);
-        lv_refr_now(Display);
 
         /* Initialize SNTP after WiFi is connected */
         Error = TimeManager_InitSNTP();
@@ -480,7 +481,7 @@ extern "C" void app_main(void)
         /* Load events using Event Manager */
         Error = EventManager_LoadEvents(&Client, &Start, &End);
         if (Error == ESP_OK) {
-            ESP_LOGD(TAG, "Successfully loaded %d events", EventManager_GetEventCount());
+            ESP_LOGI(TAG, "Successfully loaded %d events", EventManager_GetEventCount());
         } else {
             ESP_LOGE(TAG, "Failed to load events: 0x%x!", Error);
         }
@@ -495,6 +496,11 @@ extern "C" void app_main(void)
 
     Screen_Dashboard = GUI_VIEW_CREATE();
     lv_scr_load(Screen_Dashboard);
+
+    /* Destroy the status screen after switching to free resources and
+       prevent any leftover rendering artifacts on the e-paper display. */
+    UI_Status_Destroy();
+
     GUI_VIEW_UPDATE_HEADER(&CurrentTime);
     GUI_VIEW_UPDATE_BATTERY(BatteryPercentage);
     GUI_VIEW_UPDATE_RSSI(RSSI);
@@ -502,37 +508,82 @@ extern "C" void app_main(void)
     /* Add events from Event Manager to Dashboard */
     if ((EventManager_GetEvents(&EventList) == ESP_OK) && (EventList != NULL) && (EventList->Count > 0)) {
         Event_Node_t *p_Current = EventList->p_Head;
-        int event_count = 0;
+        int EventLimit = 0;
 
-        ESP_LOGD(TAG, "Adding %d events to dashboard", EventList->Count);
+        /* Prepare current date for comparison (midnight) */
+        struct tm CurrentDate = CurrentTime;
+        CurrentDate.tm_hour = 0;
+        CurrentDate.tm_min = 0;
+        CurrentDate.tm_sec = 0;
+        time_t CurrentDateTimestamp = mktime(&CurrentDate);
 
-        while ((p_Current != NULL) && (event_count < UI_MAX_EVENTS)) {
+        ESP_LOGI(TAG, "Adding events to dashboard (filtering for current date: %04d-%02d-%02d)",
+                 CurrentTime.tm_year + 1900, CurrentTime.tm_mon + 1, CurrentTime.tm_mday);
+
+        while ((p_Current != NULL) && (EventLimit < UI_MAX_EVENTS)) {
             Event_t *p_Event = &p_Current->Event;
             struct tm StartTime;
             struct tm EndTime;
             char start_str[20];
             char end_str[20];
+            bool show_event = false;
 
             localtime_r(&p_Event->StartTime, &StartTime);
             localtime_r(&p_Event->EndTime, &EndTime);
 
-            snprintf(start_str, sizeof(start_str), "%02d:%02d", StartTime.tm_hour, StartTime.tm_min);
-            snprintf(end_str, sizeof(end_str), "%02d:%02d", EndTime.tm_hour, EndTime.tm_min);
+            /* Calculate day difference using timestamps for accurate cross-month/year comparison */
+            struct tm EventDate = StartTime;
+            EventDate.tm_hour = 0;
+            EventDate.tm_min = 0;
+            EventDate.tm_sec = 0;
+            time_t EventDateTimestamp = mktime(&EventDate);
+            int day_diff = static_cast<int>((EventDateTimestamp - CurrentDateTimestamp) / (24 * 60 * 60));
 
-            ESP_LOGD(TAG, "Adding event: %s at %s-%s on day_diff=%d, event_mday=%d, current_mday=%d)", 
-                     p_Event->Title, start_str, end_str, StartTime.tm_mday - CurrentTime.tm_mday, StartTime.tm_mday, CurrentTime.tm_mday);
-            GUI_VIEW_ADD_EVENT(StartTime.tm_mday - CurrentTime.tm_mday, StartTime.tm_hour,
-                               p_Event->Title,
-                               start_str,
-                               end_str,
-                               p_Event->Location,
-                               p_Event->Description);
+            /* Filter events based on type and date */
+            if (p_Event->isAllDay) {
+                /* All-day events: Show only on their actual date (day_diff == 0) */
+                show_event = (day_diff == 0);
+                ESP_LOGI(TAG, "All-day event '%s' on day_diff=%d -> %s",
+                         p_Event->Title, day_diff, show_event ? "SHOW" : "SKIP");
+            } else {
+                /* Timed events: Show if they occur today or are currently ongoing
+                 * (start before/during today and end after/during today)
+                 */
+                show_event = (day_diff == 0) || ((EventDateTimestamp <= CurrentDateTimestamp) &&
+                                                 (p_Event->EndTime >= CurrentDateTimestamp));
+                ESP_LOGI(TAG, "Timed event '%s' on day_diff=%d -> %s",
+                         p_Event->Title, day_diff, show_event ? "SHOW" : "SKIP");
+            }
 
-            event_count++;
+            if (show_event) {
+                snprintf(start_str, sizeof(start_str), "%02d:%02d", StartTime.tm_hour, StartTime.tm_min);
+                snprintf(end_str, sizeof(end_str), "%02d:%02d", EndTime.tm_hour, EndTime.tm_min);
+
+                ESP_LOGI(TAG, "Adding %s event: %s at %s-%s (date: %04d-%02d-%02d, day_diff=%d)",
+                         p_Event->isAllDay ? "ALL-DAY" : "TIMED",
+                         p_Event->Title, start_str, end_str,
+                         StartTime.tm_year + 1900, StartTime.tm_mon + 1, StartTime.tm_mday,
+                         day_diff);
+
+                GUI_VIEW_ADD_EVENT(day_diff, StartTime.tm_hour,
+                                   p_Event->Title,
+                                   start_str,
+                                   end_str,
+                                   p_Event->Location,
+                                   p_Event->Description);
+
+                EventLimit++;
+            }
+
             p_Current = p_Current->p_Next;
         }
 
-        ESP_LOGD(TAG, "Added %d events to dashboard UI", event_count);
+        ESP_LOGD(TAG, "Added %d events to dashboard UI (filtered from %d total)", EventLimit, EventList->Count);
+
+        if (EventLimit == 0) {
+            ESP_LOGI(TAG, "No events for today after filtering");
+            GUI_VIEW_CLEAR_EVENTS();
+        }
     } else {
         ESP_LOGI(TAG, "No events to display");
 
@@ -558,8 +609,6 @@ main_power_down:
 
         ESP_LOGI(TAG, "Setting alarm for: %02d:%02d", CurrentTime.tm_hour, CurrentTime.tm_min);
 
-        //vTaskDelay(100 / portTICK_PERIOD_MS);
-
         /* Set new alarm (overwrites any existing alarm) */
         TimeManager_SetAlarm(&CurrentTime);
     }
@@ -569,8 +618,7 @@ main_power_down:
     I2CM_Deinit(I2C_Bus_Handle);
 
     gpio_config(&PwrOff_GPIO);
-    for (uint8_t i = 0; i < 5; ++i)
-    {
+    for (uint8_t i = 0; i < 5; ++i) {
         gpio_set_level(GPIO_NUM_44, 0);
         vTaskDelay(50 / portTICK_PERIOD_MS);
         gpio_set_level(GPIO_NUM_44, 1);

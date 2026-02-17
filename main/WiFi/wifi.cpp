@@ -41,7 +41,7 @@ static void on_WiFi_Event(void *p_Arg, esp_event_base_t EventBase,
 
     if (EventBase == IP_EVENT) {
         if (EventId == IP_EVENT_STA_GOT_IP) {
-            ip_event_got_ip_t *p_Event = (ip_event_got_ip_t *)p_EventData;
+            ip_event_got_ip_t *p_Event = static_cast<ip_event_got_ip_t *>(p_EventData);
             ESP_LOGD(TAG, "IP adresse received: " IPSTR, IP2STR(&p_Event->ip_info.ip));
             _WiFi_RetryNum = 0;
             _WiFi_IsConnected = true;
@@ -70,8 +70,8 @@ esp_err_t WiFi_Init(char* SSID, char* Password, uint8_t Retries, uint32_t Timeou
 
     memset(&WiFiConfig, 0, sizeof(wifi_config_t));
 
-    strcpy((char *)WiFiConfig.sta.ssid, SSID);
-    strcpy((char *)WiFiConfig.sta.password, Password);
+    strcpy(reinterpret_cast<char *>(WiFiConfig.sta.ssid), SSID);
+    strcpy(reinterpret_cast<char *>(WiFiConfig.sta.password), Password);
 
     WiFiConfig.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     WiFiConfig.sta.pmf_cfg.capable = true;

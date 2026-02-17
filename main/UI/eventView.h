@@ -27,6 +27,7 @@
 #include <esp_err.h>
 
 #include <lvgl.h>
+#include "../Export/fonts/custom_fonts.h"
 
 #include "../EventManager/eventTypes.h"
 
@@ -75,8 +76,8 @@ esp_err_t EventView_Update(EventView_Handle_t *p_Handle);
  *  @param p_UserData User data to pass to callback
  *  @return         ESP_OK on success, error code otherwise
  */
-esp_err_t EventView_SetClickCallback(EventView_Handle_t *p_Handle, 
-                                     EventView_ClickCallback_t Callback, 
+esp_err_t EventView_SetClickCallback(EventView_Handle_t *p_Handle,
+                                     EventView_ClickCallback_t Callback,
                                      void *p_UserData);
 
 /** @brief          Show event details popup.

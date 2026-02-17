@@ -33,7 +33,7 @@ extern "C" {
 
 /** @brief Maximum length for event title.
  */
-#define EVENT_TITLE_MAX_LENGTH      64
+#define EVENT_TITLE_MAX_LENGTH      128
 
 /** @brief Maximum length for event description.
  */
@@ -41,7 +41,7 @@ extern "C" {
 
 /** @brief Maximum length for event location.
  */
-#define EVENT_LOCATION_MAX_LENGTH   64
+#define EVENT_LOCATION_MAX_LENGTH   128
 
 /** @brief Maximum length for event UID.
  */

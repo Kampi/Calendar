@@ -29,7 +29,7 @@ PATTERNS = ["*.c", "*.cpp", "*.h"]
 
 def run_astyle(source, target, env):
     project_dir = env.get("PROJECT_DIR")
-    astyle_config = os.path.join(project_dir, "scripts/astyle.cfg")
+    astyle_config = os.path.join(project_dir, "scripts/.astyle.cfg")
 
     try:
         subprocess.run(["astyle", "--version"], capture_output = True, check = True)

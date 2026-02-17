@@ -46,7 +46,8 @@ ESP_EVENT_DECLARE_BASE(SNTP_EVENTS);
  *  @param SyncInterval SNTP sync interval in seconds
  *  @return             ESP_OK on success
  */
-esp_err_t SNTP_Init(const char* p_Timezone = "CET-1CEST,M3.5.0,M10.5.0/3", const char* p_Server = "pool.ntp.org", uint32_t SyncInterval = 3600);
+esp_err_t SNTP_Init(const char* p_Timezone = "CET-1CEST,M3.5.0,M10.5.0/3", const char* p_Server = "pool.ntp.org",
+                    uint32_t SyncInterval = 3600);
 
 /** @brief  Deinitialize SNTP and event handlers.
  *  @return ESP_OK on success

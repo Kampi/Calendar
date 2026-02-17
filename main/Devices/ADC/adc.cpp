@@ -41,23 +41,23 @@
 #define ADC_OUTLIER_THRESHOLD   CONFIG_BATTERY_ADC_OUTLIER_THRESHOLD
 
 #ifdef CONFIG_BATTERY_ADC_1
-    #define ADC_UNIT    ADC_UNIT_1
+#define ADC_UNIT    ADC_UNIT_1
 #elif CONFIG_BATTERY_ADC_2
-    #define ADC_UNIT    ADC_UNIT_2
+#define ADC_UNIT    ADC_UNIT_2
 #else
-    #error "No ADC channel configured for battery measurement"
+#error "No ADC channel configured for battery measurement"
 #endif
 
 #ifdef CONFIG_BATTERY_ADC_ATT_0
-    #define ADC_ATTEN   ADC_ATTEN_DB_0
+#define ADC_ATTEN   ADC_ATTEN_DB_0
 #elif CONFIG_BATTERY_ADC_ATT_2_5
-    #define ADC_ATTEN   ADC_ATTEN_DB_2_5
+#define ADC_ATTEN   ADC_ATTEN_DB_2_5
 #elif CONFIG_BATTERY_ADC_ATT_6
-    #define ADC_ATTEN   ADC_ATTEN_DB_6
+#define ADC_ATTEN   ADC_ATTEN_DB_6
 #elif CONFIG_BATTERY_ADC_ATT_12
-    #define ADC_ATTEN   ADC_ATTEN_DB_12
+#define ADC_ATTEN   ADC_ATTEN_DB_12
 #else
-    #error "No ADC attenuation configured for battery measurement"
+#error "No ADC attenuation configured for battery measurement"
 #endif
 
 static bool _ADC_Calib_Done = false;
@@ -161,7 +161,7 @@ static int ADC_CalculateMedian(int *p_Array, size_t Size)
  */
 static int ADC_CompareInt(const void *a, const void *b)
 {
-    return (*(int *)a - *(int *)b);
+    return (*static_cast<const int *>(a) - *static_cast<const int *>(b));
 }
 
 /** @brief          Calculate battery percentage using improved LiPo discharge curve
@@ -191,7 +191,7 @@ static uint8_t ADC_CalculateBatteryPercentage(int Voltage)
     /* Clamp to min/max */
     if (Voltage <= Curve[0].Voltage) {
         return 0;
-    }else if (Voltage >= Curve[(sizeof(Curve) / sizeof(Curve[0])) - 1].Voltage) {
+    } else if (Voltage >= Curve[(sizeof(Curve) / sizeof(Curve[0])) - 1].Voltage) {
         return 100;
     }
 
@@ -199,7 +199,8 @@ static uint8_t ADC_CalculateBatteryPercentage(int Voltage)
     for (size_t i = 0; i < (sizeof(Curve) / sizeof(Curve[0])) - 1; i++) {
         if ((Voltage >= Curve[i].Voltage) && (Voltage <= Curve[i + 1].Voltage)) {
             /* Linear interpolation between two points */
-            return Curve[i].Percentage + ((Curve[i + 1].Percentage - Curve[i].Percentage) * (Voltage - Curve[i].Voltage) / (Curve[i + 1].Voltage - Curve[i].Voltage));
+            return Curve[i].Percentage + ((Curve[i + 1].Percentage - Curve[i].Percentage) * (Voltage - Curve[i].Voltage) /
+                                          (Curve[i + 1].Voltage - Curve[i].Voltage));
         }
     }
 
@@ -249,7 +250,7 @@ esp_err_t ADC_ReadBattery(int *p_Voltage, uint8_t *p_Percentage)
         }
 
         ValidSamples++;
-        
+
         /* Small delay between samples */
         if (i < (ADC_SAMPLES - 1)) {
             vTaskDelay(ADC_SAMPLE_DELAY_MS / portTICK_PERIOD_MS);
@@ -271,7 +272,7 @@ esp_err_t ADC_ReadBattery(int *p_Voltage, uint8_t *p_Percentage)
     /* Filter outliers and calculate average of remaining samples */
     for (int i = 0; i < ValidSamples; i++) {
         int Deviation;
-        
+
         Deviation = Voltages[i] - MedianVoltage;
         if (Deviation < 0) {
             Deviation = -Deviation;

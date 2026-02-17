@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ui_dashboard.cpp
  *
  *  Copyright (C) Daniel Kampert, 2026
@@ -122,7 +122,7 @@ static void UI_Dashboard_Show_Event_Info(Event_Data_t *p_EventData)
     /* Title */
     title_label = lv_label_create(content);
     lv_label_set_text(title_label, p_EventData->title ? p_EventData->title : "Event");
-    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(title_label, &lv_font_montserrat_ext_28, 0);
     lv_obj_set_style_text_color(title_label, lv_color_hex(0x000000), 0);
     lv_label_set_long_mode(title_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(title_label, lv_pct(100));
@@ -159,7 +159,7 @@ static void UI_Dashboard_Show_Event_Info(Event_Data_t *p_EventData)
         }
 
         lv_label_set_text(time_label, time_str);
-        lv_obj_set_style_text_font(time_label, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(time_label, &lv_font_montserrat_ext_20, 0);
         lv_obj_set_style_text_color(time_label, lv_color_hex(0x000000), 0);
         lv_obj_align_to(time_label, time_icon, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
     }
@@ -185,7 +185,7 @@ static void UI_Dashboard_Show_Event_Info(Event_Data_t *p_EventData)
 
         loc_label = lv_label_create(loc_container);
         lv_label_set_text(loc_label, p_EventData->location);
-        lv_obj_set_style_text_font(loc_label, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(loc_label, &lv_font_montserrat_ext_20, 0);
         lv_obj_set_style_text_color(loc_label, lv_color_hex(0x000000), 0);
         lv_label_set_long_mode(loc_label, LV_LABEL_LONG_WRAP);
         lv_obj_set_width(loc_label, lv_pct(85));
@@ -213,7 +213,7 @@ static void UI_Dashboard_Show_Event_Info(Event_Data_t *p_EventData)
 
         desc_label = lv_label_create(desc_container);
         lv_label_set_text(desc_label, p_EventData->description);
-        lv_obj_set_style_text_font(desc_label, &lv_font_montserrat_18, 0);
+        lv_obj_set_style_text_font(desc_label, &lv_font_montserrat_ext_18, 0);
         lv_obj_set_style_text_color(desc_label, lv_color_hex(0x000000), 0);
         lv_label_set_long_mode(desc_label, LV_LABEL_LONG_WRAP);
         lv_obj_set_width(desc_label, lv_pct(85));
@@ -230,7 +230,7 @@ static void UI_Dashboard_Show_Event_Info(Event_Data_t *p_EventData)
 
     close_label = lv_label_create(close_btn);
     lv_label_set_text(close_label, "Close");
-    lv_obj_set_style_text_font(close_label, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_font(close_label, &lv_font_montserrat_ext_22, 0);
     lv_obj_center(close_label);
 }
 
@@ -239,13 +239,13 @@ static void UI_Dashboard_Show_Event_Info(Event_Data_t *p_EventData)
  */
 static void _ui_on_Clicked_Handler(lv_event_t *p_Event)
 {
-    Event_Data_t *event_data = (Event_Data_t *)lv_event_get_user_data(p_Event);
+    Event_Data_t *event_data = static_cast<Event_Data_t *>(lv_event_get_user_data(p_Event));
     if (event_data != NULL) {
         UI_Dashboard_Show_Event_Info(event_data);
     }
 }
 
-lv_obj_t* UI_Dashboard_Create(uint8_t Hours_Start, uint8_t Hours_End)
+lv_obj_t *UI_Dashboard_Create(uint8_t Hours_Start, uint8_t Hours_End)
 {
     lv_obj_t *header;
     lv_obj_t *time_line;
@@ -271,21 +271,21 @@ lv_obj_t* UI_Dashboard_Create(uint8_t Hours_Start, uint8_t Hours_End)
 
     /* Header title label */
     header_label = lv_label_create(header);
-    lv_obj_set_style_text_font(header_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(header_label, &lv_font_montserrat_ext_24, 0);
     lv_obj_set_style_text_color(header_label, lv_color_hex(0x000000), 0);
     lv_obj_align(header_label, LV_ALIGN_LEFT_MID, 15, 0);
 
     /* Battery label */
     battery_label = lv_label_create(header);
     lv_label_set_text(battery_label, LV_SYMBOL_BATTERY_FULL " 100%");
-    lv_obj_set_style_text_font(battery_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(battery_label, &lv_font_montserrat_ext_28, 0);
     lv_obj_set_style_text_color(battery_label, lv_color_hex(0x000000), 0);
     lv_obj_align(battery_label, LV_ALIGN_RIGHT_MID, -10, 0);
 
     /* Last updated label (centered between week label and battery) */
     last_updated_label = lv_label_create(header);
     lv_label_set_text(last_updated_label, "Last updated: --:--:--");
-    lv_obj_set_style_text_font(last_updated_label, &lv_font_montserrat_24, 0);
+    lv_obj_set_style_text_font(last_updated_label, &lv_font_montserrat_ext_24, 0);
     lv_obj_set_style_text_color(last_updated_label, lv_color_hex(0x000000), 0);
     lv_obj_align(last_updated_label, LV_ALIGN_CENTER, 0, 0);
 
@@ -310,7 +310,7 @@ lv_obj_t* UI_Dashboard_Create(uint8_t Hours_Start, uint8_t Hours_End)
         time_label = lv_label_create(calendar_container);
         snprintf(time_str, sizeof(time_str), "%02d:00", _ui_Hours_Start + i);
         lv_label_set_text(time_label, time_str);
-        lv_obj_set_style_text_font(time_label, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(time_label, &lv_font_montserrat_ext_20, 0);
         lv_obj_set_style_text_color(time_label, lv_color_hex(0x000000), 0);
         lv_obj_set_pos(time_label, 5, 43 + i * UI_HOUR_HEIGHT);
     }
@@ -329,7 +329,7 @@ lv_obj_t* UI_Dashboard_Create(uint8_t Hours_Start, uint8_t Hours_End)
     for (uint8_t i = 0; i < (sizeof(day_labels) / sizeof(day_labels[0])); i++) {
         day_labels[i] = lv_label_create(calendar_container);
         lv_label_set_text(day_labels[i], "Day");
-        lv_obj_set_style_text_font(day_labels[i], &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(day_labels[i], &lv_font_montserrat_ext_20, 0);
         lv_obj_set_style_text_color(day_labels[i], lv_color_hex(0x000000), 0);
         lv_obj_set_pos(day_labels[i], UI_TIME_LABEL_WIDTH + 20 + i * UI_DAY_WIDTH, 5);
 
@@ -391,14 +391,14 @@ void UI_Dashboard_Update(struct tm *p_TimeInfo)
 
     /* Update day labels */
     current_day = *p_TimeInfo;
-    for(uint8_t i = 0; i < (sizeof(day_labels) / sizeof(day_labels[0])); i++) {
+    for (uint8_t i = 0; i < (sizeof(day_labels) / sizeof(day_labels[0])); i++) {
         if (day_labels[i] != NULL) {
             char day_str[50];
 
             snprintf(day_str, sizeof(day_str), "%s, %s %02d",
-                    weekdays[current_day.tm_wday],
-                    months[current_day.tm_mon],
-                    current_day.tm_mday);
+                     weekdays[current_day.tm_wday],
+                     months[current_day.tm_mon],
+                     current_day.tm_mday);
             lv_label_set_text(day_labels[i], day_str);
 
             current_day.tm_mday++;
@@ -468,7 +468,7 @@ void UI_Dashboard_Add_Event(int DayDiff, uint8_t Hour, const char *Title,
     }
 
     day_col = DayDiff;
-    if((DayDiff < 0) || (DayDiff > (sizeof(day_labels) / sizeof(day_labels[0]) - 1))) {
+    if ((DayDiff < 0) || (DayDiff > (sizeof(day_labels) / sizeof(day_labels[0]) - 1))) {
         day_col = 0;
     }
 
@@ -524,7 +524,7 @@ void UI_Dashboard_Add_Event(int DayDiff, uint8_t Hour, const char *Title,
     x_pos = cell_start + desired_padding;
 
     /* Allocate and store event data */
-    Event_Data_t *event_data = (Event_Data_t *)heap_caps_malloc(sizeof(Event_Data_t), MALLOC_CAP_SPIRAM);
+    Event_Data_t *event_data = static_cast<Event_Data_t *>(heap_caps_malloc(sizeof(Event_Data_t), MALLOC_CAP_SPIRAM));
     if (event_data == NULL) {
         ESP_LOGE(TAG, "Failed to allocate event data!");
         return;
@@ -556,15 +556,16 @@ void UI_Dashboard_Add_Event(int DayDiff, uint8_t Hour, const char *Title,
 
     /* Create event label */
     lv_obj_t *event_label = lv_label_create(event_box);
-    snprintf(TitleBuffer, sizeof(TitleBuffer), "%s - %02hhu:%02hhu (%d minutes)", Title, start_hour, start_min, duration_minutes);
+    snprintf(TitleBuffer, sizeof(TitleBuffer), "%s - %02hhu:%02hhu (%d minutes)", Title, start_hour, start_min,
+             duration_minutes);
     lv_label_set_text(event_label, TitleBuffer);
-    lv_obj_set_style_text_font(event_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(event_label, &lv_font_montserrat_ext_18, 0);
     lv_obj_set_style_text_color(event_label, lv_color_hex(0x000000), 0);
     lv_label_set_long_mode(event_label, LV_LABEL_LONG_DOT);
     lv_obj_set_width(event_label, UI_DAY_WIDTH - 35);
     lv_obj_align(event_label, LV_ALIGN_TOP_LEFT, 0, 0);
 
-    ESP_LOGI(TAG, "Added event '%s' at pos(%d,%d) height=%d duration=%d min, start=%02hhu:%02hhu end=%02hhu:%02hhu", 
+    ESP_LOGI(TAG, "Added event '%s' at pos(%d,%d) height=%d duration=%d min, start=%02hhu:%02hhu end=%02hhu:%02hhu",
              Title, x_pos, y_pos, event_height, duration_minutes, start_hour, start_min, end_hour, end_min);
 }
 
@@ -585,7 +586,7 @@ void UI_Dashboard_Clear_Events(void)
                 /* Verify it's not one of our day labels or time labels */
                 if ((first_child != day_labels[0]) && (first_child != day_labels[1])) {
                     /* Free event data if attached */
-                    Event_Data_t *event_data = (Event_Data_t *)lv_obj_get_user_data(child);
+                    Event_Data_t *event_data = static_cast<Event_Data_t *>(lv_obj_get_user_data(child));
                     if (event_data != NULL) {
                         if (event_data->title) {
                             free(event_data->title);

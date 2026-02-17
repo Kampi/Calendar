@@ -184,7 +184,7 @@ esp_err_t SettingsManager_GetCalDAV(App_Settings_CalDAV_t* p_Settings)
     return ESP_OK;
 }
 
-void SettingsManager_GetCalendars(std::list<std::string>* p_Calendars)
+void SettingsManager_GetCalendars(std::list<std::string> *p_Calendars)
 {
     std::copy(_State.Settings.Calendars.begin(), _State.Settings.Calendars.end(), std::back_inserter(*p_Calendars));
 }

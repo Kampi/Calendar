@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ui_loading.cpp
  *
  *  Copyright (C) Daniel Kampert, 2026
@@ -28,17 +28,19 @@
 
 #define UI_HEADER_HEIGHT            70
 
-static lv_obj_t* status_label;
-static lv_obj_t* battery_label;
-static lv_obj_t* header;
+static lv_obj_t *status_label;
+static lv_obj_t *battery_label;
+static lv_obj_t *header;
 static lv_obj_t *status_screen;
 static lv_obj_t *rssi_label;
 
-lv_obj_t* UI_Status_Create(void)
+lv_obj_t *UI_Status_Create(void)
 {
     /* Create main screen */
     status_screen = lv_obj_create(NULL);
     lv_obj_remove_style_all(status_screen);
+    lv_obj_clear_flag(status_screen, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(status_screen, LV_SCROLLBAR_MODE_OFF);
 
     /* Set fullscreen white background */
     lv_obj_set_size(status_screen, LV_PCT(100), LV_PCT(100));
@@ -58,12 +60,14 @@ lv_obj_t* UI_Status_Create(void)
     lv_obj_set_style_shadow_width(header, 0, 0);
     lv_obj_set_style_radius(header, 0, 0);
     lv_obj_set_style_pad_all(header, 10, 0);
+    lv_obj_clear_flag(header, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(header, LV_SCROLLBAR_MODE_OFF);
 
     /* Create status label */
     status_label = lv_label_create(status_screen);
     lv_label_set_text(status_label, LV_SYMBOL_DOWNLOAD " Loading");
     lv_obj_set_width(status_label, LV_PCT(100));
-    lv_obj_set_style_text_font(status_label, &lv_font_montserrat_40, 0);
+    lv_obj_set_style_text_font(status_label, &lv_font_montserrat_ext_40, 0);
     lv_obj_set_style_text_color(status_label, lv_color_hex(0x000000), 0);
     lv_obj_set_style_text_align(status_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(status_label, LV_ALIGN_CENTER, 0, 0);
@@ -71,14 +75,14 @@ lv_obj_t* UI_Status_Create(void)
     /* Battery label */
     battery_label = lv_label_create(header);
     lv_label_set_text(battery_label, LV_SYMBOL_BATTERY_FULL " 100%");
-    lv_obj_set_style_text_font(battery_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(battery_label, &lv_font_montserrat_ext_28, 0);
     lv_obj_set_style_text_color(battery_label, lv_color_hex(0x000000), 0);
     lv_obj_align(battery_label, LV_ALIGN_RIGHT_MID, -10, 0);
 
     /* RSSI label */
     rssi_label = lv_label_create(header);
     lv_label_set_text(rssi_label, "");
-    lv_obj_set_style_text_font(rssi_label, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(rssi_label, &lv_font_montserrat_ext_28, 0);
     lv_obj_set_style_text_color(rssi_label, lv_color_hex(0x000000), 0);
     lv_obj_align(rssi_label, LV_ALIGN_CENTER, 200, 0);
 

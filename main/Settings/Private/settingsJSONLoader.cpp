@@ -189,7 +189,7 @@ static esp_err_t SettingsManager_Mount_SD_Card(void)
     esp_err_t Error;
     sdmmc_card_t *card;
     const char mount_point[] = "/sdcard";
-    
+
     ESP_LOGD(TAG, "Initializing SD card");
 
     sdmmc_host_t Host = SDSPI_HOST_DEFAULT();
@@ -225,14 +225,14 @@ static esp_err_t SettingsManager_Mount_SD_Card(void)
         .allocation_unit_size = 16 * 1024
     };
 
-    Error = esp_vfs_fat_sdspi_mount(mount_point, &Host, &Slot, &Mount_Config, &card); 
+    Error = esp_vfs_fat_sdspi_mount(mount_point, &Host, &Slot, &Mount_Config, &card);
     if (Error != ESP_OK) {
         if (Error == ESP_FAIL) {
             ESP_LOGD(TAG, "Failed to mount SD card filesystem!");
         } else {
             ESP_LOGD(TAG, "Failed to mount SD card: 0x%x", Error);
         }
-        
+
         return Error;
     }
 
@@ -315,7 +315,7 @@ static esp_err_t SettingsManager_Load_JSON(SettingsManager_State_t *p_State, con
     ESP_LOGD(TAG, "File size: %ld bytes", FileSize);
 
     /* Allocate buffer */
-    Buffer = (char*)heap_caps_malloc(FileSize + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    Buffer = static_cast<char *>(heap_caps_malloc(FileSize + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     if (Buffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate %ld bytes", FileSize);
 
@@ -401,13 +401,13 @@ esp_err_t SettingsManager_LoadDefaultsFromJSON(SettingsManager_State_t *p_State)
     } else {
         ESP_LOGD(TAG, "SD card not available, trying LittleFS");
     }
-    
+
     /* 2. Try LittleFS */
     Error = esp_vfs_littlefs_register(&LittleFS_Config);
-    if (Error == ESP_OK) {        
+    if (Error == ESP_OK) {
         Error = SettingsManager_Load_JSON(p_State, "/littlefs/settings.json");
         esp_vfs_littlefs_unregister(LittleFS_Config.partition_label);
-        
+
         if (Error == ESP_OK) {
             ESP_LOGD(TAG, "Settings loaded from LittleFS");
             return ESP_OK;
