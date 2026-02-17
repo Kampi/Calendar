@@ -34,6 +34,8 @@
 
 #include <stdio.h>
 
+#include <driver/gpio.h>
+
 #include <lvgl.h>
 #include <FastEPD.h>
 #include <caldav_client.h>
@@ -122,6 +124,14 @@ static esp_lcd_panel_io_i2c_config_t I2C_Touch_Config = {
     },
     .scl_speed_hz = 400 * 1000,
 };
+static gpio_config_t pwroff_gpio = {
+    .pin_bit_mask = (1ULL << GPIO_NUM_44),
+    .mode = GPIO_MODE_OUTPUT,
+    .pull_up_en = GPIO_PULLUP_DISABLE,
+    .pull_down_en = GPIO_PULLDOWN_ENABLE,
+    .intr_type = GPIO_INTR_DISABLE,
+};
+
 static struct tm CurrentTime;
 
 /* RTC memory to persist across deep sleep */
@@ -335,16 +345,19 @@ extern "C" void app_main(void)
     ESP_LOGD(TAG, "Display size: %dx%d", epaper.width(), epaper.height());
 
     ESP_LOGD(TAG, "Allocating %d bytes for draw buffer", GUI_DRAW_BUFFER_SIZE);
-    LVGL_DrawBuffer = (uint16_t *)heap_caps_malloc(GUI_DRAW_BUFFER_SIZE, MALLOC_CAP_SPIRAM);
+    LVGL_DrawBuffer = static_cast<uint16_t *>(heap_caps_malloc(GUI_DRAW_BUFFER_SIZE, MALLOC_CAP_SPIRAM));
     if (LVGL_DrawBuffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate draw buffer!");
+
         return;
     }
 
     Display = lv_display_create(epaper.width(), epaper.height());
     if (Display == NULL) {
         ESP_LOGE(TAG, "Failed to create display!");
+
         heap_caps_free(LVGL_DrawBuffer);
+
         return;
     }
 
@@ -391,6 +404,7 @@ extern "C" void app_main(void)
         ESP_LOGD(TAG, "Updating time via NTP (isReset=%d)", isReset);
         TimeManager_Config.BusHandle = I2C_Bus_Handle;
         TimeManager_Init(&TimeManager_Config);
+        TimeManager_ClearAlarm();
         TimeManager_SyncFromSNTP(5000);
         if (TimeManager_GetTime(&CurrentTime) == ESP_OK) {
             ESP_LOGD(TAG, "Time updated: %02d:%02d:%02d", CurrentTime.tm_hour, CurrentTime.tm_min, CurrentTime.tm_sec);
@@ -399,6 +413,7 @@ extern "C" void app_main(void)
 
     /* Fetch calendar events */
     if ((EventManager_Init() == ESP_OK) && (CalDAV_Client_Init(&CalDAV_Config, &Client) == ESP_OK)) {
+        esp_err_t Error;
         struct tm Start = CurrentTime;
         Start.tm_hour = 0;
         Start.tm_min = 0;
@@ -427,7 +442,7 @@ extern "C" void app_main(void)
                  End.tm_hour, End.tm_min, End.tm_sec);
 
         /* Load events using Event Manager */
-        esp_err_t Error = EventManager_LoadEvents(&Client, &Start, &End);
+        Error = EventManager_LoadEvents(&Client, &Start, &End);
         if (Error == ESP_OK) {
             ESP_LOGD(TAG, "Successfully loaded %d events", EventManager_GetEventCount());
         } else {
@@ -455,7 +470,7 @@ extern "C" void app_main(void)
 
         ESP_LOGD(TAG, "Adding %d events to dashboard", EventList->Count);
 
-        while ((p_Current != NULL) && (event_count < UI_MAX_EVENTS)) {  /* Limit to 10 events for display */
+        while ((p_Current != NULL) && (event_count < UI_MAX_EVENTS)) {
             Event_t *p_Event = &p_Current->Event;
             struct tm StartTime;
             struct tm EndTime;
@@ -484,6 +499,7 @@ extern "C" void app_main(void)
         ESP_LOGD(TAG, "Added %d events to dashboard UI", event_count);
     } else {
         ESP_LOGI(TAG, "No events to display");
+
         GUI_VIEW_CLEAR_EVENTS();
     }
 
@@ -492,17 +508,24 @@ extern "C" void app_main(void)
     EventManager_Deinit();
 
 main_power_down:
-    /* Power down the display */
-    epaper.einkPower(false);
+    if (TimeManager_GetTime(&CurrentTime) == ESP_OK) {
+        CurrentTime.tm_hour += 3;
 
-    /* Cleanup before sleep */
-    ESP_LOGD(TAG, "Cleaning up and entering deep sleep for %d hours", System_Settings.SleepDurationHours);
-    heap_caps_free(LVGL_DrawBuffer);
+        /* Normalize the time after adding the sleep time */
+        mktime(&CurrentTime);
 
-    /* Configure wake-up timer */
-    uint64_t sleep_time_us = System_Settings.SleepDurationHours * 60ULL * 60ULL * 1000000ULL;
-    esp_sleep_enable_timer_wakeup(sleep_time_us);
+        TimeManager_SetAlarm(&CurrentTime);
+    }
 
-    ESP_LOGD(TAG, "Entering deep sleep... Next wake-up in %d hours", System_Settings.SleepDurationHours);
-    esp_deep_sleep_start();
+    TimeManager_Deinit();
+
+    I2CM_Deinit(I2C_Bus_Handle);
+
+    gpio_config(&pwroff_gpio);
+    for (uint8_t i = 0; i < 5; ++i)
+    {
+        gpio_set_level(GPIO_NUM_44, 0);
+        vTaskDelay(50 / portTICK_PERIOD_MS);
+        gpio_set_level(GPIO_NUM_44, 1);
+    }
 }

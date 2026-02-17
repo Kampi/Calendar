@@ -80,8 +80,8 @@ esp_err_t WiFi_Init(char* SSID, char* Password, uint8_t Retries, uint32_t Timeou
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &WiFiConfig));
 
-    /* Enable WiFi power save mode to reduce power consumption */
-    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MIN_MODEM));
+    /* Enable WiFi maximum power save mode to reduce power consumption during WiFi operations */
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MAX_MODEM));
 
     ESP_ERROR_CHECK(esp_wifi_start());
 

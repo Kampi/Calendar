@@ -64,6 +64,18 @@ int32_t I2CM_Write(i2c_master_dev_handle_t *p_Dev_Handle, const uint8_t *p_Data,
  */
 int32_t I2CM_Read(i2c_master_dev_handle_t *p_Dev_Handle, uint8_t *p_Data, uint32_t Length);
 
+/** @brief              Write data and then read data from the I2C interface (combined operation).
+ *  @param p_Dev_Handle Pointer to I2C device handle
+ *  @param p_Write_Data Pointer to data to write
+ *  @param Write_Length Length of write data in bytes
+ *  @param p_Read_Data  Pointer to buffer for read data
+ *  @param Read_Length  Length of data to read in bytes
+ *  @return             ESP_OK when successful
+ *                      ESP_ERR_INVALID_ARG when an invalid argument is passed into the function
+ *                      ESP_ERR_INVALID_STATE when the I2C interface isn´t initialized
+ */
+int32_t I2CM_WriteRead(i2c_master_dev_handle_t *p_Dev_Handle, const uint8_t *p_Write_Data, uint32_t Write_Length, uint8_t *p_Read_Data, uint32_t Read_Length);
+
 /** @brief              Modify the content of a register.
  *  @param p_Dev_Handle Pointer to I2C device handle
  *  @param Register     Register address

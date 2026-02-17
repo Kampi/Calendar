@@ -40,23 +40,50 @@ esp_err_t BM8563_Init(i2c_master_bus_handle_t BusHandle, i2c_master_dev_handle_t
 esp_err_t BM8563_Deinit(i2c_master_dev_handle_t *p_Handle);
 
 /** @brief              Read time from BM8563.
- *  @param Handle       I2C device handle
+ *  @param p_Handle     Pointer to I2C device handle
  *  @param p_TimeInfo   Pointer to tm structure to store time
  *  @return             ESP_OK on success
  */
-esp_err_t BM8563_GetTime(i2c_master_dev_handle_t Handle, struct tm *p_TimeInfo);
+esp_err_t BM8563_GetTime(i2c_master_dev_handle_t *p_Handle, struct tm *p_TimeInfo);
 
 /** @brief              Write time to BM8563.
- *  @param Handle       I2C device handle
+ *  @param p_Handle     Pointer to I2C device handle
  *  @param p_TimeInfo   Pointer to tm structure with time to set
  *  @return             ESP_OK on success
  */
-esp_err_t BM8563_SetTime(i2c_master_dev_handle_t Handle, const struct tm *p_TimeInfo);
+esp_err_t BM8563_SetTime(i2c_master_dev_handle_t *p_Handle, const struct tm *p_TimeInfo);
 
 /** @brief          Check if RTC has valid time.
- *  @param Handle   I2C device handle
+ *  @param p_Handle Pointer to I2C device handle
  *  @return         true if RTC has valid time
  */
-bool BM8563_IsValid(i2c_master_dev_handle_t Handle);
+bool BM8563_IsValid(i2c_master_dev_handle_t *p_Handle);
+
+/** @brief              Set alarm time.
+ *  @param p_Handle     Pointer to I2C device handle
+ *  @param p_TimeInfo   Pointer to tm structure with alarm time to set
+ *                      Day and weekday fields are used if >= 0
+ *  @return             ESP_OK on success
+ */
+esp_err_t BM8563_SetAlarm(i2c_master_dev_handle_t *p_Handle, const struct tm *p_TimeInfo);
+
+/** @brief          Disable alarm.
+ *  @param p_Handle Pointer to I2C device handle
+ *  @return         ESP_OK on success
+ */
+esp_err_t BM8563_ClearAlarm(i2c_master_dev_handle_t *p_Handle);
+
+/** @brief          Clear alarm interrupt flag.
+ *                  Must be called after alarm triggers to clear INT pin.
+ *  @param p_Handle Pointer to I2C device handle
+ *  @return         ESP_OK on success
+ */
+esp_err_t BM8563_ClearAlarmFlag(i2c_master_dev_handle_t *p_Handle);
+
+/** @brief          Check if alarm flag is set.
+ *  @param p_Handle Pointer to I2C device handle
+ *  @return         true if alarm has triggered
+ */
+bool BM8563_IsAlarmActive(i2c_master_dev_handle_t *p_Handle);
 
 #endif /* BM8563_H_ */

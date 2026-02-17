@@ -23,6 +23,17 @@
 #include <time.h>
 #include <driver/i2c_master.h>
 #include <driver/gpio.h>
+#include <esp_event.h>
+
+/** @brief TimeManager events base.
+ */
+ESP_EVENT_DECLARE_BASE(TIMEMANAGER_EVENTS);
+
+/** @brief TimeManager event IDs.
+ */
+enum {
+    TIMEMANAGER_EVENT_ALARM_TRIGGERED,  /**< RTC alarm triggered */
+};
 
 /** @brief Time manager p_Configuration.
  */
@@ -77,5 +88,29 @@ esp_err_t TimeManager_SyncToRTC(void);
  *  @return true if time has been set
  */
 bool TimeManager_IsTimeValid(void);
+
+/** @brief          Set RTC alarm time.
+ *  @param p_TimeInfo Pointer to tm structure with alarm time
+ *                  tm_hour and tm_min are used for time
+ *                  tm_mday and tm_wday can be used for specific day/weekday (-1 to ignore)
+ *  @return         ESP_OK on success
+ */
+esp_err_t TimeManager_SetAlarm(const struct tm *p_TimeInfo);
+
+/** @brief  Disable RTC alarm.
+ *  @return ESP_OK on success
+ */
+esp_err_t TimeManager_ClearAlarm(void);
+
+/** @brief  Clear RTC alarm interrupt flag.
+ *          Must be called after alarm triggers to re-enable alarm.
+ *  @return ESP_OK on success
+ */
+esp_err_t TimeManager_ClearAlarmFlag(void);
+
+/** @brief  Check if RTC alarm has triggered.
+ *  @return true if alarm flag is set
+ */
+bool TimeManager_IsAlarmActive(void);
 
 #endif /* TIMEMANAGER_H_ */
