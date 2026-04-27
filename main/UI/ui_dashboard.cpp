@@ -554,6 +554,9 @@ void UI_Dashboard_Add_Event(int DayDiff, uint8_t Hour, const char *Title,
     /* Add click event with event data */
     lv_obj_add_event_cb(event_box, _ui_on_Clicked_Handler, LV_EVENT_CLICKED, event_data);
 
+    /* Store event_data on the object so UI_Dashboard_Clear_Events can retrieve and free it */
+    lv_obj_set_user_data(event_box, event_data);
+
     /* Create event label */
     lv_obj_t *event_label = lv_label_create(event_box);
     snprintf(TitleBuffer, sizeof(TitleBuffer), "%s - %02hhu:%02hhu (%d minutes)", Title, start_hour, start_min,

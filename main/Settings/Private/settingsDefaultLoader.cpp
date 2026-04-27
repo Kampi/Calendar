@@ -37,7 +37,13 @@ static const char *TAG = "settings_default_loader";
 
 void SettingsManager_InitDefaults(SettingsManager_State_t *p_State)
 {
-    memset(&p_State->Settings, 0, sizeof(App_Settings_t));
+    /* Clear non-trivial members through their own API. */
+    p_State->Settings.Calendars.clear();
+
+    /* Zero only the trivially-copyable sub-structs. */
+    memset(&p_State->Settings.WiFi,   0, sizeof(p_State->Settings.WiFi));
+    memset(&p_State->Settings.System, 0, sizeof(p_State->Settings.System));
+    memset(&p_State->Settings.CalDAV, 0, sizeof(p_State->Settings.CalDAV));
 
     SettingsManager_InitDefaultWiFi(&p_State->Settings);
     SettingsManager_InitDefaultSystem(&p_State->Settings);

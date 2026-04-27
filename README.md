@@ -46,7 +46,7 @@ Open-Source ESP32-S3 based e-paper calendar display with [CalDAV](https://en.wik
 Clone the repository and initialise the submodules:
 
 ```sh
-git clone https://github.com/Kampi/ESP32-Calendar
+git clone https://github.com/Kampi/ESP32-Calendar.git
 cd ESP32-Calendar
 git submodule update --init --recursive
 ```

@@ -29,8 +29,14 @@
 
 #include <esp_err.h>
 
+/** @brief  Initialize the ADC peripheral and configure it for battery voltage measurement.
+ *  @return ESP_OK on success, ESP_ERR_* on failure
+ */
 esp_err_t ADC_Init(void);
 
+/** @brief  Deinitialize the ADC peripheral and release associated resources.
+ *  @return ESP_OK on success, ESP_ERR_* on failure
+ */
 esp_err_t ADC_Deinit(void);
 
 /** @brief          Read battery voltage and calculate percentage

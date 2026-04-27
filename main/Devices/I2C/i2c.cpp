@@ -72,7 +72,7 @@ int32_t I2CM_Write(i2c_master_dev_handle_t *p_Dev_Handle, const uint8_t *p_Data,
     }
 
     ESP_LOGD(TAG, "Write %u bytes:", static_cast<unsigned int>(Length));
-    for (uint8_t i = 0; i < Length; i++) {
+    for (uint32_t i = 0; i < Length; i++) {
         ESP_LOGD(TAG, "     Byte %u: 0x%02X", static_cast<unsigned int>(i), *(p_Data + i));
     }
 
@@ -154,8 +154,13 @@ int32_t I2CM_ModifyRegister(i2c_master_dev_handle_t *p_Dev_Handle, uint8_t Regis
     int32_t Error;
     uint8_t Data[2] = {Register, 0xFF};
 
-    Error = I2CM_Write(p_Dev_Handle, &Data[0], 1) || I2CM_Read(p_Dev_Handle, &Data[1], 1);
-    if (Error) {
+    Error = I2CM_Write(p_Dev_Handle, &Data[0], 1);
+    if (Error != ESP_OK) {
+        return Error;
+    }
+
+    Error = I2CM_Read(p_Dev_Handle, &Data[1], 1);
+    if (Error != ESP_OK) {
         return Error;
     }
 

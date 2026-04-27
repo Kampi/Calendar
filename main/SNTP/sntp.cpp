@@ -43,12 +43,18 @@ static void on_SNTP_Time_Sync(struct timeval *p_tv)
 
 esp_err_t SNTP_Init(const char* p_Timezone, const char* p_Server, uint32_t SyncInterval)
 {
+    if (p_Server == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
     esp_sntp_setoperatingmode(SNTP_OPMODE_POLL);
     esp_sntp_setservername(0, p_Server);
     esp_sntp_set_time_sync_notification_cb(on_SNTP_Time_Sync);
     esp_sntp_init();
 
-    SNTP_SetTimezone(p_Timezone);
+    if (p_Timezone != NULL) {
+        SNTP_SetTimezone(p_Timezone);
+    }
 
     /* Setup automatic sync timer if interval is specified */
     if (SyncInterval > 0) {
@@ -75,22 +81,20 @@ esp_err_t SNTP_GetTime(uint8_t Retries)
 
     memset(&TimeInfo, 0, sizeof(struct tm));
 
-    while ((TimeInfo.tm_year < (2016 - 1900)) && (++Retry < Retries)) {
-        ESP_LOGD(TAG, "Waiting for system time... (%d/%d)", Retry, Retries);
+    while ((TimeInfo.tm_year < (2016 - 1900)) && (Retry < Retries)) {
+        ESP_LOGD(TAG, "Waiting for system time... (%d/%d)", Retry + 1, Retries);
         vTaskDelay(2000 / portTICK_PERIOD_MS);
         time(&Now);
         localtime_r(&Now, &TimeInfo);
+        Retry++;
     }
 
-    if (Retry == Retries) {
+    if (TimeInfo.tm_year < (2016 - 1900)) {
         ESP_LOGW(TAG, "Failed to synchronize time!");
         return ESP_FAIL;
     }
 
     ESP_LOGD(TAG, "Time synchronized successfully");
-
-    time(&Now);
-    localtime_r(&Now, &TimeInfo);
 
     return ESP_OK;
 }

@@ -78,7 +78,7 @@ static adc_oneshot_chan_cfg_t ADC_Config = {
     .bitwidth = ADC_BITWIDTH_DEFAULT,
 };
 
-const char *TAG = "ADC";
+static const char *TAG = "ADC";
 
 esp_err_t ADC_Init(void)
 {

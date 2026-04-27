@@ -59,7 +59,7 @@
 #define GUI_VIEW_ADD_EVENT(...)         UI_DayView_Add_Event(__VA_ARGS__)
 #define GUI_VIEW_CLEAR_EVENTS(...)      UI_DayView_Clear_Events(__VA_ARGS__)
 #define GUI_VIEW_DESTROY(...)           UI_DayView_Destroy(__VA_ARGS__)
-#elif CONFIG_GUI_VIEW_CALENDAR
+#elif CONFIG_GUI_VIEW_TABLE
 #define GUI_VIEW_CREATE(...)            UI_Dashboard_Create(__VA_ARGS__)
 #define GUI_VIEW_UPDATE_HEADER(...)     UI_Dashboard_Update_Header(__VA_ARGS__)
 #define GUI_VIEW_UPDATE_BATTERY(...)    UI_Dashboard_Update_Battery(__VA_ARGS__)

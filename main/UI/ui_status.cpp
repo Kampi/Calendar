@@ -140,5 +140,9 @@ void UI_Status_Destroy(void)
     if (status_screen != NULL) {
         lv_obj_del(status_screen);
         status_screen = NULL;
+        status_label  = NULL;
+        battery_label = NULL;
+        rssi_label    = NULL;
+        header        = NULL;
     }
 }

@@ -52,6 +52,15 @@
 #define SETTINGS_CALDAV_DEFAULT_PASSWORD                ""
 #define SETTINGS_CALDAV_DEFAULT_TIMEOUT_MS              5000
 
+/** @brief POD-only subset of App_Settings_t used for NVS blob serialization.
+ *         The non-POD Calendars list is persisted separately via dedicated NVS keys.
+ */
+typedef struct {
+    App_Settings_WiFi_t WiFi;                   /**< WiFi settings. */
+    App_Settings_System_t System;               /**< System settings. */
+    App_Settings_CalDAV_t CalDAV;               /**< CalDAV settings. */
+} App_Settings_POD_t;
+
 /** @brief Settings Manager state.
  */
 typedef struct {

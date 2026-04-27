@@ -346,13 +346,15 @@ esp_err_t TimeManager_SyncFromSNTP(uint32_t TimeoutMs)
     }
 
     /* Wait for SNTP sync */
-    do {
+    while (Timeout > 0) {
         vTaskDelay(pdMS_TO_TICKS(100));
 
         if (_TimeManager_State.isNTPSynced) {
             return ESP_OK;
         }
-    } while ((Timeout > 0) && (Timeout -= 100) > 0);
+
+        Timeout = (Timeout > 100) ? (Timeout - 100) : 0;
+    }
 
     ESP_LOGW(TAG, "SNTP sync timeout after %lu ms", static_cast<unsigned long>(TimeoutMs));
 

@@ -19,7 +19,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y zip
-          zip -r ${GITHUB_REF_NAME}.zip .
+          zip -r ${GITHUB_REF_NAME}.zip . \
             -x "*.git*" \
             -x "*node_modules*" \
             -x "*.pio*" \
@@ -121,9 +121,9 @@ jobs:
           VERSION: ${{ env.VERSION }}
         run: |
           echo "Using version: ${{ env.VERSION }}"
-          sed -i -E "s/(PYROVISION_VERSION_MAJOR=)[0-9]+/\1${{ env.MAJOR }}/" CMakeLists.txt
-          sed -i -E "s/(PYROVISION_VERSION_MINOR=)[0-9]+/\1${{ env.MINOR }}/" CMakeLists.txt
-          sed -i -E "s/(PYROVISION_VERSION_BUILD=)[0-9]+/\1${{ env.BUILD }}/" CMakeLists.txt
+          sed -i -E "s/(CALENDAR_VERSION_MAJOR=)[0-9]+/\1${{ env.MAJOR }}/" main/CMakeLists.txt
+          sed -i -E "s/(CALENDAR_VERSION_MINOR=)[0-9]+/\1${{ env.MINOR }}/" main/CMakeLists.txt
+          sed -i -E "s/(CALENDAR_VERSION_BUILD=)[0-9]+/\1${{ env.BUILD }}/" main/CMakeLists.txt
           sed -i "s/^## \[Unreleased\]/## [${{ env.VERSION }}] - $(date +'%Y-%m-%d')/" CHANGELOG.md
 
       - name: Build PlatformIO Project
