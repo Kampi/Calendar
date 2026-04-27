@@ -31,6 +31,8 @@
 #include <nvs_flash.h>
 #include <nvs.h>
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <cJSON.h>
@@ -106,6 +108,8 @@ esp_err_t SettingsManager_Load(App_Settings_t *p_Settings)
 {
     esp_err_t Error;
     size_t RequiredSize;
+    App_Settings_POD_t POD;
+    uint8_t CalendarCount = 0;
 
     if (_State.isInitialized == false) {
         return ESP_ERR_INVALID_STATE;
@@ -115,32 +119,118 @@ esp_err_t SettingsManager_Load(App_Settings_t *p_Settings)
 
     Error = nvs_get_blob(_State.NVS_Handle, "settings", NULL, &RequiredSize);
     if (Error == ESP_ERR_NVS_NOT_FOUND) {
-
         return ESP_ERR_NVS_NOT_FOUND;
     } else if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get settings size: %d!", Error);
         return Error;
     }
 
-    if (RequiredSize != sizeof(App_Settings_t)) {
+    if (RequiredSize != sizeof(App_Settings_POD_t)) {
         ESP_LOGW(TAG, "Settings size mismatch (expected %u, got %u), erasing and using defaults",
-                 sizeof(App_Settings_t), RequiredSize);
+                 sizeof(App_Settings_POD_t), RequiredSize);
 
-        /* Erase the old settings */
+        /* Erase the stale settings and any calendar keys */
         nvs_erase_key(_State.NVS_Handle, "settings");
+        nvs_erase_key(_State.NVS_Handle, "cal_count");
         nvs_commit(_State.NVS_Handle);
 
         return ESP_ERR_INVALID_SIZE;
     }
 
-    Error = nvs_get_blob(_State.NVS_Handle, "settings", &_State.Settings, &RequiredSize);
+    Error = nvs_get_blob(_State.NVS_Handle, "settings", &POD, &RequiredSize);
     if (Error != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read settings: %d!", Error);
-
         return Error;
     }
 
+    _State.Settings.WiFi = POD.WiFi;
+    _State.Settings.System = POD.System;
+    _State.Settings.CalDAV = POD.CalDAV;
+
+    /* Read the calendar list from dedicated NVS string keys */
+    _State.Settings.Calendars.clear();
+    Error = nvs_get_u8(_State.NVS_Handle, "cal_count", &CalendarCount);
+    if (Error == ESP_OK) {
+        for (uint8_t i = 0; i < CalendarCount; i++) {
+            char Key[16];
+            size_t Len = 0;
+
+            snprintf(Key, sizeof(Key), "cal_%u", static_cast<unsigned>(i));
+
+            Error = nvs_get_str(_State.NVS_Handle, Key, NULL, &Len);
+            if (Error == ESP_OK && Len > 0) {
+                char *p_Cal = static_cast<char *>(malloc(Len));
+                if (p_Cal != NULL) {
+                    Error = nvs_get_str(_State.NVS_Handle, Key, p_Cal, &Len);
+                    if (Error == ESP_OK) {
+                        _State.Settings.Calendars.push_back(std::string(p_Cal));
+                    }
+
+                    free(p_Cal);
+                }
+            }
+        }
+    }
+
+    p_Settings->WiFi = _State.Settings.WiFi;
+    p_Settings->System = _State.Settings.System;
+    p_Settings->CalDAV = _State.Settings.CalDAV;
+    p_Settings->Calendars = _State.Settings.Calendars;
+
     ESP_LOGD(TAG, "Settings loaded from NVS");
+
+    return ESP_OK;
+}
+
+esp_err_t SettingsManager_Save(void)
+{
+    esp_err_t Error;
+    App_Settings_POD_t POD;
+
+    if (_State.isInitialized == false) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    POD.WiFi = _State.Settings.WiFi;
+    POD.System = _State.Settings.System;
+    POD.CalDAV = _State.Settings.CalDAV;
+
+    Error = nvs_set_blob(_State.NVS_Handle, "settings", &POD, sizeof(App_Settings_POD_t));
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write settings blob: %d!", Error);
+        return Error;
+    }
+
+    /* Persist the calendar list as individual NVS string entries */
+    uint8_t CalendarCount = static_cast<uint8_t>(_State.Settings.Calendars.size());
+    Error = nvs_set_u8(_State.NVS_Handle, "cal_count", CalendarCount);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write calendar count: %d!", Error);
+        return Error;
+    }
+
+    uint8_t i = 0;
+    for (const std::string &Cal : _State.Settings.Calendars) {
+        char Key[16];
+
+        snprintf(Key, sizeof(Key), "cal_%u", static_cast<unsigned>(i));
+
+        Error = nvs_set_str(_State.NVS_Handle, Key, Cal.c_str());
+        if (Error != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to write calendar %u: %d!", i, Error);
+            return Error;
+        }
+
+        i++;
+    }
+
+    Error = nvs_commit(_State.NVS_Handle);
+    if (Error != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to commit settings: %d!", Error);
+        return Error;
+    }
+
+    ESP_LOGD(TAG, "Settings saved to NVS");
 
     return ESP_OK;
 }

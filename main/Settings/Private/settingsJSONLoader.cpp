@@ -162,6 +162,13 @@ static void SettingsManager_LoadCalDAV(SettingsManager_State_t *p_State, const c
             strncpy(p_State->Settings.CalDAV.Password, "", sizeof(p_State->Settings.CalDAV.Password));
         }
 
+        cJSON *timeout = cJSON_GetObjectItem(caldav, "timeout");
+        if (cJSON_IsNumber(timeout)) {
+            p_State->Settings.CalDAV.TimeoutMs = static_cast<uint32_t>(timeout->valueint);
+        } else {
+            p_State->Settings.CalDAV.TimeoutMs = SETTINGS_CALDAV_DEFAULT_TIMEOUT_MS;
+        }
+
         cJSON *calendars = cJSON_GetObjectItem(caldav, "calendars");
         if (cJSON_IsArray(calendars)) {
             /* Use placement new to construct list in uninitialized memory */
@@ -240,6 +247,8 @@ static esp_err_t SettingsManager_Mount_SD_Card(void)
     DIR *dir = opendir(mount_point);
     if (dir == NULL) {
         ESP_LOGE(TAG, "Failed to open mount point: %s", mount_point);
+        esp_vfs_fat_sdcard_unmount(mount_point, card);
+        spi_bus_free(static_cast<spi_host_device_t>(Host.slot));
         return ESP_FAIL;
     }
 

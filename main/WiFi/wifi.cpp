@@ -50,7 +50,7 @@ static void on_WiFi_Event(void *p_Arg, esp_event_base_t EventBase,
     }
 }
 
-esp_err_t WiFi_Init(char* SSID, char* Password, uint8_t Retries, uint32_t TimeoutMs)
+esp_err_t WiFi_Init(const char* SSID, const char* Password, uint8_t Retries, uint32_t TimeoutMs)
 {
     wifi_config_t WiFiConfig;
     wifi_init_config_t WiFiInitConfig = WIFI_INIT_CONFIG_DEFAULT();
@@ -70,8 +70,8 @@ esp_err_t WiFi_Init(char* SSID, char* Password, uint8_t Retries, uint32_t Timeou
 
     memset(&WiFiConfig, 0, sizeof(wifi_config_t));
 
-    strcpy(reinterpret_cast<char *>(WiFiConfig.sta.ssid), SSID);
-    strcpy(reinterpret_cast<char *>(WiFiConfig.sta.password), Password);
+    strlcpy(reinterpret_cast<char *>(WiFiConfig.sta.ssid), SSID, sizeof(WiFiConfig.sta.ssid));
+    strlcpy(reinterpret_cast<char *>(WiFiConfig.sta.password), Password, sizeof(WiFiConfig.sta.password));
 
     WiFiConfig.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     WiFiConfig.sta.pmf_cfg.capable = true;

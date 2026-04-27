@@ -80,6 +80,13 @@ static void event_button_clicked(lv_event_t *e)
     }
 }
 
+/** @brief  Free user_data when the button is deleted by lv_obj_clean / lv_obj_del.
+ */
+static void event_button_deleted(lv_event_t *e)
+{
+    free(lv_event_get_user_data(e));
+}
+
 /** @brief          Calculate slot height based on configuration.
  *  @param p_Config View configuration
  *  @return         Slot height in pixels
@@ -188,10 +195,11 @@ static esp_err_t calculate_event_position(EventView_Handle_t *p_Handle, Event_t 
                                           int16_t *p_X, int16_t *p_Y,
                                           uint16_t *p_Width, uint16_t *p_Height)
 {
-    struct tm *p_StartTime = localtime(&p_Event->StartTime);
-    struct tm *p_EndTime = localtime(&p_Event->EndTime);
+    struct tm StartTime;
+    struct tm EndTime;
 
-    if ((p_StartTime == NULL) || (p_EndTime == NULL)) {
+    if ((localtime_r(&p_Event->StartTime, &StartTime) == NULL) ||
+        (localtime_r(&p_Event->EndTime, &EndTime) == NULL)) {
         return ESP_FAIL;
     }
 
@@ -201,7 +209,7 @@ static esp_err_t calculate_event_position(EventView_Handle_t *p_Handle, Event_t 
 
     /* Calculate vertical position based on start time */
     TimeSlot_Index_t start_slot;
-    EventManager_TimeToSlot(p_StartTime, &start_slot);
+    EventManager_TimeToSlot(&StartTime, &start_slot);
 
     if ((start_slot.Hour < p_Handle->Config.StartHour) || (start_slot.Hour >= p_Handle->Config.EndHour)) {
         return ESP_ERR_INVALID_ARG;  /* Event outside visible hours */
@@ -348,6 +356,7 @@ esp_err_t EventView_Update(EventView_Handle_t *p_Handle)
                 memcpy(&p_UserData->Event, p_Event, sizeof(Event_t));
                 p_UserData->p_ViewHandle = p_Handle;
                 lv_obj_add_event_cb(p_EventBtn, event_button_clicked, LV_EVENT_CLICKED, p_UserData);
+                lv_obj_add_event_cb(p_EventBtn, event_button_deleted, LV_EVENT_DELETE, p_UserData);
             }
 
             ESP_LOGD(TAG, "Created event button: %s at (%d, %d) size (%d x %d)",

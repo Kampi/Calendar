@@ -36,8 +36,8 @@
 /** @brief WiFi settings.
  */
 typedef struct {
-    char SSID[33];                              /**< WiFi SSID. */
-    char Password[65];                          /**< WiFi password. */
+    char SSID[34];                              /**< WiFi SSID. */
+    char Password[66];                          /**< WiFi password. */
     uint8_t MaxRetries;                         /**< Maximum number of connection retries. */
     uint32_t TimeoutMs;                         /**< Connection timeout in milliseconds (0 = wait forever). */
 } App_Settings_WiFi_t;

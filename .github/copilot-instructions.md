@@ -1,16 +1,16 @@
-# GitHub Copilot Instructions for PyroVision Firmware
+# GitHub Copilot Instructions for ESP32 CalDAV Calendar Firmware
 
 ## Project Overview
 
-PyroVision is an ESP32-S3 based thermal imaging camera firmware using the ESP-IDF framework. The project manages a Lepton thermal camera with WiFi connectivity, web interface, VISA server, and comprehensive settings management.
+This is an ESP32-S3 based e-paper calendar display firmware using the ESP-IDF framework. The device periodically wakes from deep sleep, connects to a WiFi network, fetches calendar events from a CalDAV server, renders them on an e-paper display via LVGL, and returns to deep sleep.
 
 **Key Technologies:**
 - Platform: ESP32-S3 (ESP-IDF framework)
 - Build System: PlatformIO
 - RTOS: FreeRTOS
-- GUI: LVGL
-- Storage: NVS, LittleFS, SD Card
-- Networking: WiFi (STA/AP), HTTP Server, WebSockets, VISA/SCPI
+- GUI: LVGL (rendered to e-paper via FastEPD)
+- Storage: NVS, LittleFS (16 MB flash)
+- Networking: WiFi (STA), CalDAV client, SNTP
 
 ---
 
@@ -132,7 +132,7 @@ return (*static_cast<const int *>(a) - *static_cast<const int *>(b));      // Go
 
 #### Constants and Macros
 - **All UPPERCASE** with underscores: `WIFI_CONNECTED_BIT`, `NVS_NAMESPACE`, `SETTINGS_VERSION`
-- Module-specific macros should include module name: `SETTINGS_NVS_NAMESPACE`, `VISA_MAX_CLIENTS`
+- Module-specific macros should include module name: `SETTINGS_NVS_NAMESPACE`, `CALDAV_DEFAULT_TIMEOUT`
 
 #### Types
 - **Structs/Enums**: `ModuleName_Description_t` with `_t` suffix
@@ -152,31 +152,41 @@ return (*static_cast<const int *>(a) - *static_cast<const int *>(b));      // Go
 ```
 main/
 ├── main.cpp                   # Application entry point
-├── Application/
-│   ├── application.h          # Application-wide types and events
-│   ├── Manager/               # All manager modules
-│   │   ├── managers.h         # Manager includes
-│   │   ├── Settings/          # Settings management
-│   │   ├── Network/           # Network management
-│   │   ├── Devices/           # Device drivers
-│   │   ├── Time/              # Time management
-│   │   └── SD/                # SD card management
-│   └── Tasks/                 # FreeRTOS tasks
-│       ├── tasks.h            # Task declarations
-│       ├── GUI/               # GUI task
-│       ├── Lepton/            # Camera task
-│       └── Network/           # Network task
+├── Devices/                   # Low-level peripheral drivers
+│   ├── devices.h              # Aggregated device includes
+│   ├── ADC/                   # Battery voltage ADC driver
+│   ├── I2C/                   # I2C bus initialisation
+│   └── RTC/                   # BM8563 RTC driver
+├── EventManager/              # ESP Event bus helpers
+├── Export/fonts/              # Custom LVGL font files
+├── Settings/                  # Settings manager (NVS + JSON loader)
+│   ├── settingsManager.h      # Public API
+│   ├── settingsManager.cpp    # Implementation
+│   ├── settingsTypes.h        # Public types (App_Settings_t)
+│   └── Private/               # Internal loaders
+│       ├── settingsLoader.h
+│       ├── settingsJSONLoader.cpp
+│       └── settingsDefaultLoader.cpp
+├── SNTP/                      # NTP synchronisation helper
+├── TimeManager/               # Time management and RTC abstraction
+├── UI/                        # LVGL screen definitions
+│   ├── ui.h                   # Shared UI declarations
+│   ├── eventView.h/.cpp       # Event view widget
+│   ├── ui_dashboard.cpp       # Monthly calendar view
+│   ├── ui_dayview.cpp         # Agenda / list view
+│   └── ui_status.cpp          # Status bar
+└── WiFi/                      # WiFi driver and connection management
 ```
 
 #### Private Implementations
 Use `Private/` subdirectories for internal module implementations that should not be exposed:
 ```
-Manager/Settings/
+Settings/
 ├── settingsManager.h         # Public API
 ├── settingsManager.cpp       # Implementation
-├── settingsTypes.h          # Public types
+├── settingsTypes.h           # Public types
 └── Private/
-    ├── settingsLoader.h     # Internal interface
+    ├── settingsLoader.h      # Internal interface
     ├── settingsJSONLoader.cpp
     └── settingsDefaultLoader.cpp
 ```
@@ -279,10 +289,11 @@ Document struct members inline:
 
 ```cpp
 typedef struct {
-    uint16_t Port;              /**< HTTP server port. */
-    uint16_t WSPingIntervalSec; /**< WebSocket ping interval in seconds. */
-    uint8_t MaxClients;         /**< Maximum number of simultaneous clients. */
-} App_Settings_HTTP_Server_t;
+    char SSID[33];              /**< WiFi SSID. */
+    char Password[65];          /**< WiFi password. */
+    uint8_t MaxRetries;         /**< Maximum number of connection retries. */
+    uint32_t TimeoutMs;         /**< Connection timeout in milliseconds. */
+} App_Settings_WiFi_t;
 ```
 
 ### Enum Documentation
@@ -429,8 +440,9 @@ esp_err_t Module_Update(Config_t *p_Config)
 
 ### Settings Structure
 
-- Settings are organized into categories (WiFi, Display, System, etc.)
-- Each category has a dedicated struct type: `App_Settings_CategoryName_t`
+- Settings are organized into three categories: WiFi, System, CalDAV
+- Each category has a dedicated struct type: `App_Settings_WiFi_t`, `App_Settings_System_t`, `App_Settings_CalDAV_t`
+- The complete settings are held in `App_Settings_t` which also includes a `std::list<std::string>` of calendar names
 - Use `__attribute__((packed))` for settings structures stored in NVS
 - Include reserved fields for future expansion
 
@@ -439,16 +451,18 @@ esp_err_t Module_Update(Config_t *p_Config)
 Each settings category follows this pattern:
 
 ```cpp
-esp_err_t SettingsManager_GetCategory(App_Settings_Category_t* p_Settings);
-esp_err_t SettingsManager_UpdateCategory(App_Settings_Category_t* p_Settings);
+esp_err_t SettingsManager_GetWiFi(App_Settings_WiFi_t* p_Settings);
+esp_err_t SettingsManager_GetSystem(App_Settings_System_t* p_Settings);
+esp_err_t SettingsManager_GetCalDAV(App_Settings_CalDAV_t* p_Settings);
+void SettingsManager_GetCalendars(std::list<std::string> *p_Calendars);
 ```
 
-**Important**: `Update` functions modify RAM only. Call `SettingsManager_Save()` to persist changes!
+**Important**: These functions read from RAM only. Call `SettingsManager_Save()` to persist changes!
 
 ### Factory Defaults
 
 Two-tier default system:
-1. **JSON Config** (`data/default_settings.json`) - Preferred, loaded on first boot
+1. **JSON Config** (`data/settings_default.json`) - Preferred, loaded on first boot from LittleFS
 2. **Hardcoded Defaults** - Fallback in code
 
 ---
@@ -457,42 +471,41 @@ Two-tier default system:
 
 ### WiFi Management
 
-- Support both STA (Station) and AP (Access Point) modes
-- Implement retry logic with configurable max attempts
+- Station (STA) mode only — AP mode is not used
+- Implement retry logic with configurable max attempts (`MaxRetries`)
+- Connection timeout configurable per attempt (`TimeoutMs`)
 - Use ESP Event system for connection state changes
-- Store credentials securely in NVS
+- Store credentials securely in NVS via Settings Manager
 
-### HTTP/WebSocket Server
+### CalDAV Client
 
-- Maximum clients defined by `WS_MAX_CLIENTS`
-- Implement proper client tracking and cleanup
-- Use WebSocket for real-time data streaming
-- Regular ping intervals to detect disconnections
-
-### VISA/SCPI Server
-
-- Standard port: 5025
-- Implement SCPI command parsing
-- Return standard SCPI error codes
-- Support concurrent clients (up to `VISA_MAX_CLIENTS`)
+- Uses the `ESP32-CalDAV` component (`components/ESP32-CalDAV/`)
+- Configured with server URL, username, password and request timeout
+- Fetches events from one or more named calendars specified in settings
+- Called once per wake cycle; results are rendered to the display before deep sleep
 
 ---
 
 ## Device Integration
 
-### I2C/SPI Devices
+### I2C Devices
 
-- Initialize buses in device manager
-- Create device handles for each peripheral
-- Implement proper error handling and recovery
-- Use appropriate clock speeds and configurations
+- I2C bus initialised once in `Devices/I2C/`
+- **BM8563 RTC** (`Devices/RTC/`) – keeps time across deep sleep cycles; read on wake to restore `struct tm`
+- **GT911 touch controller** – capacitive touch input for the e-paper panel, used via `esp_lcd_touch_gt911`
+- Create device handles for each peripheral, implement proper error handling and recovery
 
-### Lepton Camera
+### E-Paper Display
 
-- Interface through custom ESP32-Lepton component
-- Handle frame buffers efficiently (DMA, PSRAM)
-- Implement ROI (Region of Interest) calculations
-- Support multiple ROI types (Spotmeter, Scene, AGC, Video Focus)
+- Driven by the **FastEPD** library (`components/FastEPD/`)
+- LVGL renders into a draw buffer which is flushed to FastEPD via `epaper_display_flush()`
+- Full refresh vs. partial update managed by counting LVGL flush calls
+- Draw buffer allocated in PSRAM for large frame sizes
+
+### Battery ADC
+
+- Battery voltage measured via ADC (`Devices/ADC/`) through a resistor voltage divider
+- Configurable via Kconfig: ADC unit, channel, attenuation, R1/R2 values, sample count, EMA alpha, outlier threshold
 
 ---
 
@@ -501,8 +514,8 @@ Two-tier default system:
 ### PlatformIO Configuration
 
 - Default environment: `debug`
-- Board: `esp32-s3-devkitc-1`
-- Flash size: 8MB
+- Board: `esp32-s3-devkitm-1`
+- Flash size: 16 MB
 - PSRAM: OPI mode
 - Filesystem: LittleFS
 
@@ -532,14 +545,12 @@ The project maintains comprehensive AsciiDoc documentation in the `docs/` direct
 docs/
 ├── index.adoc              # Overview and getting started
 ├── SettingsManager.adoc    # Settings management system
-├── NetworkManager.adoc     # Network and communication
-├── DeviceManager.adoc      # Device drivers and peripherals
+├── WiFi.adoc               # WiFi driver and connection management
+├── CalDAV.adoc             # CalDAV client integration
 ├── TimeManager.adoc        # Time management and RTC
-├── SDManager.adoc          # SD card management
-├── LeptonTask.adoc        # Lepton camera task
-├── GUITask.adoc           # GUI task and LVGL
-├── NetworkTask.adoc       # Network task
-└── VISAServer.adoc        # VISA/SCPI server
+├── SNTP.adoc               # NTP synchronisation
+├── Devices.adoc            # Device drivers (ADC, I2C, RTC)
+└── UI.adoc                 # LVGL UI views and event rendering
 ```
 
 #### When to Update Documentation
@@ -565,15 +576,13 @@ docs/
 
 | Code Location | Documentation File |
 |--------------|-------------------|
-| `Manager/Settings/` | `SettingsManager.adoc` |
-| `Manager/Network/` | `NetworkManager.adoc` |
-| `Manager/Devices/` | `DeviceManager.adoc` |
-| `Manager/Time/` | `TimeManager.adoc` |
-| `Manager/SD/` | `SDManager.adoc` |
-| `Tasks/Lepton/` | `LeptonTask.adoc` |
-| `Tasks/GUI/` | `GUITask.adoc` |
-| `Tasks/Network/` | `NetworkTask.adoc` |
-| `Manager/Network/VISA/` | `VISAServer.adoc` |
+| `main/Settings/` | `SettingsManager.adoc` |
+| `main/WiFi/` | `WiFi.adoc` |
+| `components/ESP32-CalDAV/` | `CalDAV.adoc` |
+| `main/TimeManager/` | `TimeManager.adoc` |
+| `main/SNTP/` | `SNTP.adoc` |
+| `main/Devices/` | `Devices.adoc` |
+| `main/UI/` | `UI.adoc` |
 
 #### Documentation Style Guidelines
 
@@ -622,10 +631,10 @@ if (Error != ESP_OK) {
 
 #### Automated Documentation Build
 
-Documentation is automatically built and deployed via GitHub Actions workflow (`.github/workflows/documentation.yml`). The CI/CD pipeline:
-- Builds all `.adoc` files to HTML and PDF
-- Deploys to GitHub Pages: https://kampi.github.io/PyroVision/
-- Creates release artifacts with PDF documentation
+Documentation is automatically built and deployed via GitHub Actions when a workflow for documentation is configured. The CI/CD pipeline should:
+- Build all `.adoc` files to HTML and PDF
+- Deploy to GitHub Pages: https://kampi.github.io/ESP32-Calendar/
+- Create release artifacts with PDF documentation
 
 **Do not commit generated HTML/PDF files** - these are built automatically by the CI/CD pipeline.
 
@@ -661,10 +670,12 @@ Documentation is automatically built and deployed via GitHub Actions workflow (`
 1. Event loop
 2. NVS Flash
 3. Settings Manager (loads from NVS)
-4. Device Manager (I2C, SPI, peripherals)
-5. Time Manager (requires RTC from Device Manager)
-6. Network Manager
-7. Tasks (GUI, Lepton, Network, etc.)
+4. Devices (I2C bus, BM8563 RTC, GT911 touch, ADC)
+5. Time Manager (reads RTC to restore current time)
+6. WiFi (connect, sync NTP if needed)
+7. CalDAV client (fetch events)
+8. GUI (render events to e-paper display)
+9. Deep sleep
 
 ### Configuration
 
@@ -760,9 +771,12 @@ platformio run --environment debug
 - **ESP-IDF Documentation**: https://docs.espressif.com/projects/esp-idf/
 - **FreeRTOS Documentation**: https://www.freertos.org/
 - **LVGL Documentation**: https://docs.lvgl.io/
-- **Project Repository**: (Add if applicable)
+- **FastEPD Library**: https://github.com/bitbank2/FastEPD
+- **CalDAV RFC 4791**: https://www.rfc-editor.org/rfc/rfc4791
+- **POSIX Timezone Database**: https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
+- **Project Repository**: https://github.com/Kampi/ESP32-Calendar
 
 ---
 
-**Last Updated**: January 15, 2026  
+**Last Updated**: April 27, 2026
 **Maintainer**: Daniel Kampert (DanielKampert@kampis-elektroecke.de)

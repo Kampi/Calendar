@@ -156,65 +156,6 @@ static time_t parse_icalendar_datetime(const char *p_DateTimeStr)
     return 0;
 }
 
-/** @brief          Parse iCalendar DURATION string (e.g. "PT1H30M") to seconds.
- *                  Supports weeks (W), days (D), hours (H), minutes (M) and seconds (S).
- *  @param p_DurationStr iCalendar DURATION value string
- *  @return         Duration in seconds, or 0 on error
- */
-static time_t parse_icalendar_duration(const char *p_DurationStr)
-{
-    const char *p;
-    int64_t TotalSeconds = 0;
-    int64_t n = 0;
-    bool InTime = false;
-
-    if (p_DurationStr == NULL) {
-        return 0;
-    }
-
-    p = p_DurationStr;
-
-    /* Skip optional sign and 'P' designator */
-    if ((*p == '+') || (*p == '-')) {
-        p++;
-    }
-
-    if (*p == 'P') {
-        p++;
-    }
-
-    while (*p) {
-        if (*p == 'T') {
-            InTime = true;
-            p++;
-            continue;
-        }
-
-        if ((*p >= '0') && (*p <= '9')) {
-            n = n * 10 + (*p - '0');
-        } else if (*p == 'W') {
-            TotalSeconds += n * 7 * 24 * 3600;
-            n = 0;
-        } else if (*p == 'D') {
-            TotalSeconds += n * 24 * 3600;
-            n = 0;
-        } else if ((*p == 'H') && InTime) {
-            TotalSeconds += n * 3600;
-            n = 0;
-        } else if ((*p == 'M') && InTime) {
-            TotalSeconds += n * 60;
-            n = 0;
-        } else if ((*p == 'S') && InTime) {
-            TotalSeconds += n;
-            n = 0;
-        }
-
-        p++;
-    }
-
-    return static_cast<time_t>(TotalSeconds);
-}
-
 /** @brief          Copy UTF-8 string into destination buffer (bounded, UTF-8-safe).
  *                  Passes all characters through as-is so LVGL can render umlauts
  *                  directly using the extended font glyphs.
@@ -461,23 +402,12 @@ esp_err_t EventManager_LoadEvents(CalDAV_Client_t *p_Client, struct tm *p_Start,
             strncpy(Event.Calendar, p_CalendarName, sizeof(Event.Calendar) - 1);
 
             /* Parse times */
-            ESP_LOGD(TAG, "Parsing event '%s': StartTime='%s', EndTime='%s', Duration='%s'",
+            ESP_LOGD(TAG, "Parsing event '%s': StartTime='%s', EndTime='%s'",
                      Event.Title,
                      p_Events[i].StartTime ? p_Events[i].StartTime : "NULL",
-                     p_Events[i].EndTime ? p_Events[i].EndTime : "NULL",
-                     p_Events[i].Duration ? p_Events[i].Duration : "NULL");
+                     p_Events[i].EndTime ? p_Events[i].EndTime : "NULL");
             Event.StartTime = parse_icalendar_datetime(p_Events[i].StartTime);
             Event.EndTime = parse_icalendar_datetime(p_Events[i].EndTime);
-
-            /* Fallback: compute end time from DURATION when DTEND is absent (RFC 5545 allows either) */
-            if ((Event.EndTime == 0) && (Event.StartTime != 0) && (p_Events[i].Duration != NULL)) {
-                time_t Duration = parse_icalendar_duration(p_Events[i].Duration);
-                if (Duration > 0) {
-                    Event.EndTime = Event.StartTime + Duration;
-                    ESP_LOGD(TAG, "Event '%s': computed EndTime from DURATION '%s' (%ld s)",
-                             Event.Title, p_Events[i].Duration, (long)Duration);
-                }
-            }
 
             /* Detect all-day events by checking if DTSTART uses DATE format */
             Event.isAllDay = is_icalendar_date_format(p_Events[i].StartTime);
